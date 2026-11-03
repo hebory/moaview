@@ -1,3 +1,5 @@
-# quicklook
+# 모아뷰 (MoaView)
 
-WorkMesh에서 만든 로컬 Git 저장소입니다.
+Windows 파일 미리보기, 이미지 보기·변환과 압축파일 콘텐츠 미리보기를 제공하는 독립 프로젝트입니다.
+
+WorkMesh 프로젝트 채널: `moaview`
