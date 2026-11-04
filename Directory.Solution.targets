@@ -1,0 +1,39 @@
+<Project>
+  <Target Name="Build">
+    <MSBuild Projects="$(MSBuildThisFileDirectory)src\MoaView\MoaView.csproj"
+             Targets="Build"
+             BuildInParallel="false" />
+    <MSBuild Projects="$(MSBuildThisFileDirectory)tests\MoaView.Tests\MoaView.Tests.csproj"
+             Targets="Build"
+             BuildInParallel="false" />
+  </Target>
+
+  <Target Name="Rebuild">
+    <MSBuild Projects="$(MSBuildThisFileDirectory)src\MoaView\MoaView.csproj"
+             Targets="Rebuild"
+             BuildInParallel="false" />
+    <MSBuild Projects="$(MSBuildThisFileDirectory)tests\MoaView.Tests\MoaView.Tests.csproj"
+             Targets="Rebuild"
+             BuildInParallel="false"
+             Properties="BuildProjectReferences=false" />
+  </Target>
+
+  <Target Name="Clean">
+    <MSBuild Projects="$(MSBuildThisFileDirectory)tests\MoaView.Tests\MoaView.Tests.csproj"
+             Targets="Clean"
+             BuildInParallel="false" />
+    <MSBuild Projects="$(MSBuildThisFileDirectory)src\MoaView\MoaView.csproj"
+             Targets="Clean"
+             BuildInParallel="false" />
+  </Target>
+
+  <Target Name="VSTest">
+    <MSBuild Projects="$(MSBuildThisFileDirectory)src\MoaView\MoaView.csproj"
+             Targets="Build"
+             BuildInParallel="false"
+             Condition="'$(VSTestNoBuild)' != 'true'" />
+    <MSBuild Projects="$(MSBuildThisFileDirectory)tests\MoaView.Tests\MoaView.Tests.csproj"
+             Targets="VSTest"
+             BuildInParallel="false" />
+  </Target>
+</Project>

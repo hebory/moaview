@@ -1,0 +1,21 @@
+<Project>
+  <PropertyGroup>
+    <BuildInParallel>false</BuildInParallel>
+    <RestoreBuildInParallel>false</RestoreBuildInParallel>
+    <RestoreDisableParallel>true</RestoreDisableParallel>
+    <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
+    <NuGetAudit>false</NuGetAudit>
+
+    <_MoaUserNuGetCache Condition="'$(USERPROFILE)' != '' and Exists('$(USERPROFILE)\.nuget\packages')">$(USERPROFILE)\.nuget\packages</_MoaUserNuGetCache>
+    <_MoaVsOfflinePackages Condition="'$(MSBuildProgramFiles32)' != '' and Exists('$(MSBuildProgramFiles32)\Microsoft Visual Studio\Shared\NuGetPackages')">$(MSBuildProgramFiles32)\Microsoft Visual Studio\Shared\NuGetPackages</_MoaVsOfflinePackages>
+    <_MoaSdkOfflinePackages Condition="'$(MSBuildProgramFiles32)' != '' and Exists('$(MSBuildProgramFiles32)\Microsoft SDKs\NuGetPackages')">$(MSBuildProgramFiles32)\Microsoft SDKs\NuGetPackages</_MoaSdkOfflinePackages>
+
+    <_MoaLocalSources Condition="'$(NUGET_PACKAGES)' != '' and Exists('$(NUGET_PACKAGES)')">$(NUGET_PACKAGES)</_MoaLocalSources>
+    <_MoaLocalSources Condition="'$(_MoaUserNuGetCache)' != ''">$(_MoaLocalSources);$(_MoaUserNuGetCache)</_MoaLocalSources>
+    <_MoaLocalSources Condition="'$(_MoaVsOfflinePackages)' != ''">$(_MoaLocalSources);$(_MoaVsOfflinePackages)</_MoaLocalSources>
+    <_MoaLocalSources Condition="'$(_MoaSdkOfflinePackages)' != ''">$(_MoaLocalSources);$(_MoaSdkOfflinePackages)</_MoaLocalSources>
+
+    <RestoreAdditionalProjectSources Condition="'$(RestoreSources)' != '' and '$(_MoaLocalSources)' != ''">$(RestoreAdditionalProjectSources);$(_MoaLocalSources)</RestoreAdditionalProjectSources>
+    <RestoreSources Condition="'$(RestoreSources)' == '' and '$(_MoaUserNuGetCache)' != '' and Exists('$(_MoaUserNuGetCache)\xunit\2.5.3') and Exists('$(_MoaUserNuGetCache)\microsoft.net.test.sdk\17.8.0') and Exists('$(_MoaUserNuGetCache)\xunit.runner.visualstudio\2.5.3')">$(_MoaLocalSources)</RestoreSources>
+  </PropertyGroup>
+</Project>
