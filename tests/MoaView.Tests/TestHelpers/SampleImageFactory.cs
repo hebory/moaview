@@ -89,6 +89,79 @@ internal static class SampleImageFactory
         return filePath;
     }
 
+    public static string WriteQuadrantImage(
+        string filePath,
+        ImageFormatKind format,
+        int width,
+        int height,
+        Color topLeft,
+        Color topRight,
+        Color bottomRight,
+        Color bottomLeft)
+    {
+        var stride = width * 4;
+        var pixels = new byte[height * stride];
+        var halfX = width / 2;
+        var halfY = height / 2;
+
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var fill = (x < halfX, y < halfY) switch
+                {
+                    (true, true) => topLeft,
+                    (false, true) => topRight,
+                    (false, false) => bottomRight,
+                    (true, false) => bottomLeft,
+                };
+
+                var offset = (y * stride) + (x * 4);
+                pixels[offset + 0] = fill.B;
+                pixels[offset + 1] = fill.G;
+                pixels[offset + 2] = fill.R;
+                pixels[offset + 3] = 255;
+            }
+        }
+
+        var bitmap = BitmapSource.Create(
+            width,
+            height,
+            96,
+            96,
+            PixelFormats.Bgra32,
+            palette: null,
+            pixels,
+            stride);
+
+        BitmapEncoder encoder = format switch
+        {
+            ImageFormatKind.Jpeg => new JpegBitmapEncoder { QualityLevel = 95 },
+            ImageFormatKind.Png => new PngBitmapEncoder(),
+            ImageFormatKind.Bmp => new BmpBitmapEncoder(),
+            ImageFormatKind.Gif => new GifBitmapEncoder(),
+            ImageFormatKind.Tiff => new TiffBitmapEncoder(),
+            _ => throw new ArgumentOutOfRangeException(nameof(format), format, null),
+        };
+
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+
+        using var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
+        encoder.Save(stream);
+        return filePath;
+    }
+
+    public static Color ReadPixelColor(BitmapSource bitmap, int x, int y)
+    {
+        BitmapSource bgraSource = bitmap.Format == PixelFormats.Bgra32
+            ? bitmap
+            : new FormatConvertedBitmap(bitmap, PixelFormats.Bgra32, null, 0);
+
+        var pixel = new byte[4];
+        bgraSource.CopyPixels(new Int32Rect(x, y, 1, 1), pixel, stride: 4, offset: 0);
+        return Color.FromArgb(pixel[3], pixel[2], pixel[1], pixel[0]);
+    }
+
     /// <summary>
     /// Windows WIC가 디코딩할 수 있는 1x1 32비트 ICO 바이너리를 생성합니다.
     /// (모아뷰 지원 범위 밖의 이미지 컨테이너 검증용)

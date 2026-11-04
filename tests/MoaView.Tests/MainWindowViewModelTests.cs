@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Media;
 using MoaView.Models;
 using MoaView.Services;
 using MoaView.Tests.TestHelpers;
@@ -31,6 +32,14 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("모아뷰 (MoaView)", vm.WindowTitle);
         Assert.Equal(SupportedFileFormats.SupportedFormatsShortText, vm.SupportedFormatsSummary);
         Assert.Equal(SupportedFileFormats.SupportedFormatsDetailText, vm.SupportedFormatsDetail);
+        Assert.False(vm.ZoomInCommand.CanExecute(null));
+        Assert.False(vm.ZoomOutCommand.CanExecute(null));
+        Assert.False(vm.ActualSizeCommand.CanExecute(null));
+        Assert.False(vm.ToggleFitToWindowCommand.CanExecute(null));
+        Assert.False(vm.RotateClockwiseCommand.CanExecute(null));
+        Assert.False(vm.RotateCounterClockwiseCommand.CanExecute(null));
+        Assert.False(vm.PreviousImageCommand.CanExecute(null));
+        Assert.False(vm.NextImageCommand.CanExecute(null));
     }
 
     [Fact]
@@ -115,5 +124,130 @@ public sealed class MainWindowViewModelTests
         Assert.True(vm.IsNoticeVisible);
         Assert.Null(vm.PreviewBitmap);
         Assert.Equal("열기 실패", vm.NoticeBadgeText);
+    }
+
+    [Fact]
+    public void ZoomAndFitCommands_StepAcrossBoundsAndResetToActualSize()
+    {
+        using var temp = new TempTestDirectory();
+        var pngPath = SampleImageFactory.WriteValidImage(
+            temp.GetPath("zoom-target.png"),
+            ImageFormatKind.Png,
+            width: 200,
+            height: 100);
+
+        var vm = new MainWindowViewModel(new ImagePreviewService(), new StubFileDialogService());
+        vm.OpenFile(pngPath);
+
+        Assert.True(vm.IsFitToWindow);
+        Assert.Equal(1.0, vm.ZoomFactor);
+        Assert.True(double.IsNaN(vm.ImageDisplayWidth));
+        Assert.True(double.IsNaN(vm.ImageDisplayHeight));
+
+        vm.ZoomInCommand.Execute(null);
+        Assert.False(vm.IsFitToWindow);
+        Assert.Equal(1.25, vm.ZoomFactor);
+        Assert.Equal(250.0, vm.ImageDisplayWidth);
+        Assert.Equal(125.0, vm.ImageDisplayHeight);
+        Assert.Equal("125%", vm.ZoomDisplay);
+
+        vm.ToggleFitToWindowCommand.Execute(null);
+        Assert.True(vm.IsFitToWindow);
+        Assert.True(double.IsNaN(vm.ImageDisplayWidth));
+
+        vm.ActualSizeCommand.Execute(null);
+        Assert.False(vm.IsFitToWindow);
+        Assert.Equal(1.0, vm.ZoomFactor);
+        Assert.Equal(200.0, vm.ImageDisplayWidth);
+        Assert.Equal(100.0, vm.ImageDisplayHeight);
+        Assert.Equal("100%", vm.ZoomDisplay);
+
+        while (vm.ZoomOutCommand.CanExecute(null))
+        {
+            vm.ZoomOutCommand.Execute(null);
+        }
+
+        Assert.Equal(MainWindowViewModel.MinZoomFactor, vm.ZoomFactor);
+        Assert.False(vm.ZoomOutCommand.CanExecute(null));
+        Assert.True(vm.ZoomInCommand.CanExecute(null));
+
+        while (vm.ZoomInCommand.CanExecute(null))
+        {
+            vm.ZoomInCommand.Execute(null);
+        }
+
+        Assert.Equal(MainWindowViewModel.MaxZoomFactor, vm.ZoomFactor);
+        Assert.False(vm.ZoomInCommand.CanExecute(null));
+        Assert.True(vm.ZoomOutCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void RotateCommands_RotatePreviewBitmapQuadrantsAndResetWhenOpeningAnotherFile()
+    {
+        using var temp = new TempTestDirectory();
+        var red = Color.FromRgb(220, 40, 40);
+        var green = Color.FromRgb(40, 190, 70);
+        var blue = Color.FromRgb(45, 95, 225);
+        var yellow = Color.FromRgb(235, 200, 35);
+
+        var firstPath = SampleImageFactory.WriteQuadrantImage(
+            temp.GetPath("01_quadrant.png"),
+            ImageFormatKind.Png,
+            width: 80,
+            height: 40,
+            topLeft: red,
+            topRight: green,
+            bottomRight: blue,
+            bottomLeft: yellow);
+        var secondPath = SampleImageFactory.WriteValidImage(
+            temp.GetPath("02_plain.bmp"),
+            ImageFormatKind.Bmp,
+            width: 60,
+            height: 30);
+
+        var vm = new MainWindowViewModel(new ImagePreviewService(), new StubFileDialogService());
+        vm.OpenFile(firstPath);
+
+        Assert.Equal(0, vm.RotationDegrees);
+        Assert.Equal(80, vm.DisplayPixelWidth);
+        Assert.Equal(40, vm.DisplayPixelHeight);
+
+        vm.RotateClockwiseCommand.Execute(null);
+        Assert.Equal(90, vm.RotationDegrees);
+        Assert.Equal("90°", vm.RotationDisplay);
+        Assert.Equal(40, vm.DisplayPixelWidth);
+        Assert.Equal(80, vm.DisplayPixelHeight);
+        // 원본 메타데이터 해상도는 그대로 유지하고 회전 각도를 함께 표시합니다.
+        Assert.Equal(80, vm.CurrentResult.PixelWidth);
+        Assert.Equal(40, vm.CurrentResult.PixelHeight);
+        Assert.Contains("회전 90°", vm.MetadataSummary, StringComparison.Ordinal);
+
+        // 80x40 -> 시계 방향 90도 회전 시(40x80): 기존 좌상단(red)은 우상단으로 이동합니다.
+        Assert.NotNull(vm.PreviewBitmap);
+        Assert.Equal(red, SampleImageFactory.ReadPixelColor(vm.PreviewBitmap!, x: 30, y: 10));
+        Assert.Equal(green, SampleImageFactory.ReadPixelColor(vm.PreviewBitmap!, x: 30, y: 70));
+        Assert.Equal(blue, SampleImageFactory.ReadPixelColor(vm.PreviewBitmap!, x: 10, y: 70));
+        Assert.Equal(yellow, SampleImageFactory.ReadPixelColor(vm.PreviewBitmap!, x: 10, y: 10));
+
+        vm.RotateCounterClockwiseCommand.Execute(null);
+        Assert.Equal(0, vm.RotationDegrees);
+        Assert.Equal(80, vm.DisplayPixelWidth);
+        Assert.Equal(40, vm.DisplayPixelHeight);
+
+        vm.RotateCounterClockwiseCommand.Execute(null);
+        Assert.Equal(270, vm.RotationDegrees);
+        Assert.Equal(40, vm.DisplayPixelWidth);
+        Assert.Equal(80, vm.DisplayPixelHeight);
+        Assert.Equal(red, SampleImageFactory.ReadPixelColor(vm.PreviewBitmap!, x: 10, y: 70));
+
+        // 다음 파일로 이동하면 회전 및 수동 배율 상태가 기본값으로 초기화되어야 합니다.
+        vm.ZoomIn();
+        Assert.False(vm.IsFitToWindow);
+        vm.NextImageCommand.Execute(null);
+
+        Assert.Equal(secondPath, vm.CurrentResult.FilePath);
+        Assert.Equal(0, vm.RotationDegrees);
+        Assert.True(vm.IsFitToWindow);
+        Assert.Equal(1.0, vm.ZoomFactor);
     }
 }

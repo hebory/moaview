@@ -11,8 +11,69 @@
         Background="#181A1F"
         Foreground="#F3F4F6"
         AllowDrop="True"
+        PreviewKeyDown="OnWindowPreviewKeyDown"
         DragOver="OnWindowDragOver"
         Drop="OnWindowDrop">
+    <Window.Resources>
+        <Style x:Key="ViewerToolbarButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#2C313C" />
+            <Setter Property="Foreground" Value="#F3F4F6" />
+            <Setter Property="BorderBrush" Value="#3E4656" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#3A4252" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#525D73" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#4B5568" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#1E222A" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#2A2F3A" />
+                                <Setter Property="Foreground" Value="#6B7280" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="FitModeButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ViewerToolbarButtonStyle}">
+            <Style.Triggers>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsImageVisible}" Value="True" />
+                        <Condition Binding="{Binding IsFitToWindow}" Value="True" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Background" Value="#2563EB" />
+                    <Setter Property="BorderBrush" Value="#60A5FA" />
+                    <Setter Property="Foreground" Value="#FFFFFF" />
+                </MultiDataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
     <Window.InputBindings>
         <KeyBinding Modifiers="Control"
                     Key="O"
@@ -23,11 +84,12 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- 상단 툴바 -->
+        <!-- 상단 헤더 툴바 -->
         <Border Grid.Row="0"
                 Background="#21252B"
                 BorderBrush="#2F3540"
@@ -63,8 +125,111 @@
             </DockPanel>
         </Border>
 
+        <!-- 이미지 보기 조작 툴바 -->
+        <Border x:Name="ViewerToolbar"
+                Grid.Row="1"
+                Background="#1B1E24"
+                BorderBrush="#2A2F3A"
+                BorderThickness="0,0,0,1"
+                Padding="14,6">
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- 폴더 내 이전·다음 이동 -->
+                <Button x:Name="PreviousImageButton"
+                        Style="{StaticResource ViewerToolbarButtonStyle}"
+                        Content="◀ 이전"
+                        Command="{Binding PreviousImageCommand}"
+                        Margin="0,2,6,2"
+                        ToolTip="같은 폴더의 이전 이미지 (← / PageUp)" />
+                <TextBlock x:Name="FolderPositionText"
+                           Text="{Binding FolderPositionDisplay}"
+                           MinWidth="46"
+                           TextAlignment="Center"
+                           Foreground="#D1D5DB"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           Margin="0,2,6,2" />
+                <Button x:Name="NextImageButton"
+                        Style="{StaticResource ViewerToolbarButtonStyle}"
+                        Content="다음 ▶"
+                        Command="{Binding NextImageCommand}"
+                        Margin="0,2,12,2"
+                        ToolTip="같은 폴더의 다음 이미지 (→ / PageDown)" />
+
+                <Rectangle Width="1"
+                           Height="18"
+                           Fill="#2F3540"
+                           VerticalAlignment="Center"
+                           Margin="0,2,12,2" />
+
+                <!-- 확대·축소 및 화면 맞춤 -->
+                <Button x:Name="ZoomOutButton"
+                        Style="{StaticResource ViewerToolbarButtonStyle}"
+                        Content="축소 -"
+                        Command="{Binding ZoomOutCommand}"
+                        Margin="0,2,6,2"
+                        ToolTip="축소 (- / Ctrl+-)" />
+                <TextBlock x:Name="ZoomStatusText"
+                           Text="{Binding ZoomDisplay}"
+                           MinWidth="84"
+                           TextAlignment="Center"
+                           Foreground="#E5E7EB"
+                           FontSize="12"
+                           FontWeight="Medium"
+                           VerticalAlignment="Center"
+                           Margin="0,2,6,2" />
+                <Button x:Name="ZoomInButton"
+                        Style="{StaticResource ViewerToolbarButtonStyle}"
+                        Content="확대 +"
+                        Command="{Binding ZoomInCommand}"
+                        Margin="0,2,6,2"
+                        ToolTip="확대 (+ / Ctrl++)" />
+                <Button x:Name="ActualSizeButton"
+                        Style="{StaticResource ViewerToolbarButtonStyle}"
+                        Content="100%"
+                        Command="{Binding ActualSizeCommand}"
+                        Margin="0,2,6,2"
+                        ToolTip="원본 픽셀 크기 100% (0 / Ctrl+0)" />
+                <Button x:Name="FitToWindowButton"
+                        Style="{StaticResource FitModeButtonStyle}"
+                        Content="화면 맞춤"
+                        Command="{Binding ToggleFitToWindowCommand}"
+                        Margin="0,2,12,2"
+                        ToolTip="창 크기에 맞춤 전환 (F / *)" />
+
+                <Rectangle Width="1"
+                           Height="18"
+                           Fill="#2F3540"
+                           VerticalAlignment="Center"
+                           Margin="0,2,12,2" />
+
+                <!-- 좌·우 90도 회전 -->
+                <Button x:Name="RotateLeftButton"
+                        Style="{StaticResource ViewerToolbarButtonStyle}"
+                        Content="↺ 좌회전"
+                        Command="{Binding RotateCounterClockwiseCommand}"
+                        Margin="0,2,6,2"
+                        ToolTip="반시계 방향 90° 회전 (L / Ctrl+Shift+R)" />
+                <Button x:Name="RotateRightButton"
+                        Style="{StaticResource ViewerToolbarButtonStyle}"
+                        Content="↻ 우회전"
+                        Command="{Binding RotateClockwiseCommand}"
+                        Margin="0,2,8,2"
+                        ToolTip="시계 방향 90° 회전 (R / Ctrl+R)" />
+                <TextBlock x:Name="RotationStatusText"
+                           Text="{Binding RotationDisplay}"
+                           MinWidth="32"
+                           Foreground="#9CA3AF"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           Margin="0,2,0,2" />
+            </WrapPanel>
+        </Border>
+
         <!-- 본문 미리보기 영역 -->
-        <Grid Grid.Row="1" Background="#14161A">
+        <Grid x:Name="ContentHostGrid"
+              Grid.Row="2"
+              Background="#14161A"
+              SizeChanged="OnContentHostSizeChanged">
             <!-- 1) 초기 대기 안내 -->
             <Border x:Name="EmptyStatePanel"
                     Visibility="{Binding EmptyStateVisibility}"
@@ -102,13 +267,28 @@
             <Border x:Name="ImageViewport"
                     Visibility="{Binding ImageVisibility}"
                     Padding="16">
-                <Image x:Name="PreviewImage"
-                       Source="{Binding PreviewBitmap}"
-                       Stretch="Uniform"
-                       StretchDirection="DownOnly"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
-                       RenderOptions.BitmapScalingMode="HighQuality" />
+                <ScrollViewer x:Name="ImageScrollViewer"
+                              BorderThickness="0"
+                              Padding="0"
+                              Focusable="False"
+                              HorizontalScrollBarVisibility="{Binding HorizontalScrollBarVisibility}"
+                              VerticalScrollBarVisibility="{Binding VerticalScrollBarVisibility}"
+                              SizeChanged="OnImageScrollViewerSizeChanged"
+                              PreviewMouseWheel="OnImageViewportPreviewMouseWheel"
+                              PreviewMouseLeftButtonDown="OnImageViewportMouseLeftButtonDown"
+                              PreviewMouseMove="OnImageViewportMouseMove"
+                              PreviewMouseLeftButtonUp="OnImageViewportMouseLeftButtonUp"
+                              LostMouseCapture="OnImageViewportLostMouseCapture">
+                    <Image x:Name="PreviewImage"
+                           Source="{Binding PreviewBitmap}"
+                           Width="{Binding ImageDisplayWidth}"
+                           Height="{Binding ImageDisplayHeight}"
+                           Stretch="{Binding ImageStretch}"
+                           StretchDirection="Both"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
+                </ScrollViewer>
             </Border>
 
             <!-- 3) 미지원 형식 및 처리 불가 안내 -->
@@ -157,7 +337,7 @@
         </Grid>
 
         <!-- 하단 상태 표시줄 -->
-        <Border Grid.Row="2"
+        <Border Grid.Row="3"
                 Background="#21252B"
                 BorderBrush="#2F3540"
                 BorderThickness="0,1,0,0"
