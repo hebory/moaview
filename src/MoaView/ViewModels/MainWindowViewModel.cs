@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -11,7 +12,7 @@ using MoaView.Services;
 namespace MoaView.ViewModels;
 
 /// <summary>
-/// 메인 미리보기 창의 상태와 파일 선택·열기·이미지 보기 조작 흐름을 관리하는 뷰모델입니다.
+/// 메인 미리보기 창의 상태와 파일 선택·열기·이미지 보기 조작·형식 변환 흐름을 관리하는 뷰모델입니다.
 /// </summary>
 public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
@@ -43,7 +44,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     private readonly IPreviewService _previewService;
     private readonly IFileDialogService _fileDialogService;
+    private readonly ISaveFileDialogService _saveFileDialogService;
     private readonly IFolderNavigationService _folderNavigationService;
+    private readonly IImageConversionService _imageConversionService;
 
     private readonly RelayCommand _openFileCommand;
     private readonly RelayCommand _previousImageCommand;
@@ -54,9 +57,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly RelayCommand _toggleFitToWindowCommand;
     private readonly RelayCommand _rotateClockwiseCommand;
     private readonly RelayCommand _rotateCounterClockwiseCommand;
+    private readonly RelayCommand _convertImageCommand;
+    private readonly RelayCommand _openConvertedFileCommand;
+    private readonly RelayCommand _dismissConversionNoticeCommand;
 
     private PreviewResult _currentResult = PreviewResult.Empty();
     private FolderNavigationContext _navigationContext = FolderNavigationContext.Empty;
+    private ImageConversionResult _lastConversionResult = ImageConversionResult.None();
+    private ImageFormatKind _selectedConversionFormat = ImageFormatKind.Png;
     private BitmapSource? _transformedPreviewBitmap;
     private bool _isFitToWindow = true;
     private double _zoomFactor = DefaultZoomFactor;
@@ -65,7 +73,17 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private double _viewportHeight;
 
     public MainWindowViewModel()
-        : this(new ImagePreviewService(), new Win32FileDialogService(), new FolderImageNavigationService())
+        : this(CreateDefaultDialogService())
+    {
+    }
+
+    private MainWindowViewModel(Win32FileDialogService defaultDialogService)
+        : this(
+            new ImagePreviewService(),
+            defaultDialogService,
+            defaultDialogService,
+            new FolderImageNavigationService(),
+            new ImageConversionService())
     {
     }
 
@@ -78,14 +96,31 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IPreviewService previewService,
         IFileDialogService fileDialogService,
         IFolderNavigationService folderNavigationService)
+        : this(
+            previewService,
+            fileDialogService,
+            fileDialogService as ISaveFileDialogService ?? new Win32FileDialogService(),
+            folderNavigationService,
+            new ImageConversionService())
+    {
+    }
+
+    public MainWindowViewModel(
+        IPreviewService previewService,
+        IFileDialogService fileDialogService,
+        ISaveFileDialogService saveFileDialogService,
+        IFolderNavigationService? folderNavigationService = null,
+        IImageConversionService? imageConversionService = null)
     {
         ArgumentNullException.ThrowIfNull(previewService);
         ArgumentNullException.ThrowIfNull(fileDialogService);
-        ArgumentNullException.ThrowIfNull(folderNavigationService);
+        ArgumentNullException.ThrowIfNull(saveFileDialogService);
 
         _previewService = previewService;
         _fileDialogService = fileDialogService;
-        _folderNavigationService = folderNavigationService;
+        _saveFileDialogService = saveFileDialogService;
+        _folderNavigationService = folderNavigationService ?? new FolderImageNavigationService();
+        _imageConversionService = imageConversionService ?? new ImageConversionService();
 
         _openFileCommand = new RelayCommand(param => SelectAndOpenFile(param as Window));
         _previousImageCommand = new RelayCommand(_ => MovePreviousImage(), _ => CanNavigatePrevious);
@@ -96,6 +131,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _toggleFitToWindowCommand = new RelayCommand(_ => ToggleFitToWindow(), _ => IsImageVisible);
         _rotateClockwiseCommand = new RelayCommand(_ => RotateClockwise(), _ => IsImageVisible);
         _rotateCounterClockwiseCommand = new RelayCommand(_ => RotateCounterClockwise(), _ => IsImageVisible);
+        _convertImageCommand = new RelayCommand(param => ConvertCurrentImage(param as Window), _ => CanExecuteConversion);
+        _openConvertedFileCommand = new RelayCommand(_ => OpenConvertedFile(), _ => CanOpenConvertedFile);
+        _dismissConversionNoticeCommand = new RelayCommand(_ => DismissConversionNotice(), _ => HasConversionNotice);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -119,6 +157,92 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public ICommand RotateClockwiseCommand => _rotateClockwiseCommand;
 
     public ICommand RotateCounterClockwiseCommand => _rotateCounterClockwiseCommand;
+
+    public ICommand ConvertImageCommand => _convertImageCommand;
+
+    public ICommand OpenConvertedFileCommand => _openConvertedFileCommand;
+
+    public ICommand DismissConversionNoticeCommand => _dismissConversionNoticeCommand;
+
+    public IReadOnlyList<ConversionFormatOption> AvailableConversionFormats =>
+        SupportedFileFormats.ConvertibleFormatOptions;
+
+    public ImageFormatKind SelectedConversionFormat
+    {
+        get => _selectedConversionFormat;
+        set
+        {
+            if (!SupportedFileFormats.IsConvertibleFormat(value) || _selectedConversionFormat == value)
+            {
+                return;
+            }
+
+            _selectedConversionFormat = value;
+            NotifyAllStatePropertiesChanged();
+        }
+    }
+
+    public ConversionFormatOption SelectedConversionFormatOption
+    {
+        get
+        {
+            foreach (var option in AvailableConversionFormats)
+            {
+                if (option.Format == _selectedConversionFormat)
+                {
+                    return option;
+                }
+            }
+
+            return AvailableConversionFormats[0];
+        }
+        set
+        {
+            if (value is not null)
+            {
+                SelectedConversionFormat = value.Format;
+            }
+        }
+    }
+
+    public bool CanExecuteConversion => !IsEmptyState;
+
+    public bool CanConvertLoadedFormat =>
+        State == PreviewStateKind.ImageLoaded &&
+        _currentResult.ImageFormat is { } format &&
+        SupportedFileFormats.IsConvertibleFormat(format);
+
+    public ImageConversionResult LastConversionResult => _lastConversionResult;
+
+    public ConversionStatusKind ConversionStatus => _lastConversionResult.Status;
+
+    public bool HasConversionNotice => _lastConversionResult.Status != ConversionStatusKind.None;
+
+    public Visibility ConversionNoticeVisibility =>
+        HasConversionNotice ? Visibility.Visible : Visibility.Collapsed;
+
+    public bool CanOpenConvertedFile =>
+        _lastConversionResult.IsSuccess &&
+        !string.IsNullOrWhiteSpace(_lastConversionResult.OutputFilePath) &&
+        File.Exists(_lastConversionResult.OutputFilePath);
+
+    public Visibility OpenConvertedFileVisibility =>
+        CanOpenConvertedFile ? Visibility.Visible : Visibility.Collapsed;
+
+    public string ConversionNoticeBadgeText => _lastConversionResult.Status switch
+    {
+        ConversionStatusKind.Succeeded => "변환 완료",
+        ConversionStatusKind.UnsupportedCombination => "변환 미지원",
+        ConversionStatusKind.OriginalOverwriteBlocked => "원본 보호",
+        ConversionStatusKind.Failed => "변환 실패",
+        _ => string.Empty,
+    };
+
+    public string ConversionNoticeTitle => _lastConversionResult.Title;
+
+    public string ConversionNoticeMessage => _lastConversionResult.Message;
+
+    public string SupportedConversionSummary => SupportedFileFormats.SupportedConversionShortText;
 
     public PreviewResult CurrentResult => _currentResult;
 
@@ -299,9 +423,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     {
         var result = _previewService.Load(filePath);
         _currentResult = result;
+        _lastConversionResult = ImageConversionResult.None();
         _isFitToWindow = true;
         _zoomFactor = DefaultZoomFactor;
         _rotationDegrees = 0;
+
+        if (result.State == PreviewStateKind.ImageLoaded && result.ImageFormat is { } loadedFormat)
+        {
+            _selectedConversionFormat = GetSuggestedTargetFormat(loadedFormat, _selectedConversionFormat);
+        }
 
         RebuildPreviewBitmap();
         _navigationContext = _folderNavigationService.ResolveContext(result.FilePath ?? filePath);
@@ -309,6 +439,137 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         NotifyAllStatePropertiesChanged();
         ViewResetRequested?.Invoke(this, EventArgs.Empty);
         return result;
+    }
+
+    public ImageConversionResult ConvertCurrentImage(Window? owner = null)
+    {
+        if (IsEmptyState)
+        {
+            return ImageConversionResult.None();
+        }
+
+        if (State == PreviewStateKind.Error)
+        {
+            var errorBlocked = ImageConversionResult.Failure(
+                _currentResult.FilePath,
+                outputFilePath: null,
+                sourceFormat: _currentResult.ImageFormat,
+                targetFormat: _selectedConversionFormat,
+                title: "열기에 실패한 이미지는 변환할 수 없습니다.",
+                message: $"원본 파일을 정상적으로 읽을 수 없어 변환을 실행하지 않았습니다. {_currentResult.Message}");
+            _lastConversionResult = errorBlocked;
+            NotifyAllStatePropertiesChanged();
+            return errorBlocked;
+        }
+
+        var precheck = _imageConversionService.ValidateCanConvertSource(
+            _currentResult.FilePath,
+            _currentResult.ImageFormat);
+        if (!precheck.IsSuccess)
+        {
+            var blocked = precheck with { TargetFormat = _selectedConversionFormat };
+            _lastConversionResult = blocked;
+            NotifyAllStatePropertiesChanged();
+            return blocked;
+        }
+
+        var suggestedPath = _imageConversionService.BuildSuggestedOutputPath(
+            precheck.SourceFilePath!,
+            _selectedConversionFormat);
+        var destinationPath = _saveFileDialogService.PickSaveFile(
+            suggestedPath,
+            _selectedConversionFormat,
+            owner);
+        if (string.IsNullOrWhiteSpace(destinationPath))
+        {
+            return ImageConversionResult.None();
+        }
+
+        var targetFormat = _selectedConversionFormat;
+        var pickedExtension = Path.GetExtension(destinationPath.Trim().Trim('"'));
+        if (SupportedFileFormats.TryGetConvertibleFormatByExtension(pickedExtension, out var extFormat))
+        {
+            targetFormat = extFormat;
+            _selectedConversionFormat = extFormat;
+        }
+
+        return ConvertCurrentImageTo(destinationPath, targetFormat);
+    }
+
+    public ImageConversionResult ConvertCurrentImageTo(
+        string? destinationFilePath,
+        ImageFormatKind? targetFormat = null)
+    {
+        var effectiveTarget = targetFormat ?? _selectedConversionFormat;
+        if (SupportedFileFormats.IsConvertibleFormat(effectiveTarget))
+        {
+            _selectedConversionFormat = effectiveTarget;
+
+            if (State == PreviewStateKind.Error)
+            {
+                var errorBlocked = ImageConversionResult.Failure(
+                    _currentResult.FilePath,
+                    destinationFilePath,
+                    _currentResult.ImageFormat,
+                    effectiveTarget,
+                    title: "열기에 실패한 이미지는 변환할 수 없습니다.",
+                    message: $"원본 파일을 정상적으로 읽을 수 없어 변환을 실행하지 않았습니다. {_currentResult.Message}");
+                _lastConversionResult = errorBlocked;
+                NotifyAllStatePropertiesChanged();
+                return errorBlocked;
+            }
+
+            if (_currentResult.ImageFormat is { } knownFormat && !SupportedFileFormats.IsConvertibleFormat(knownFormat))
+            {
+                var unsupportedLoaded = _imageConversionService.ValidateCanConvertSource(
+                    _currentResult.FilePath,
+                    knownFormat) with
+                {
+                    OutputFilePath = destinationFilePath,
+                    TargetFormat = effectiveTarget,
+                };
+                _lastConversionResult = unsupportedLoaded;
+                NotifyAllStatePropertiesChanged();
+                return unsupportedLoaded;
+            }
+        }
+
+        var conversionResult = _imageConversionService.Convert(
+            _currentResult.FilePath,
+            effectiveTarget,
+            destinationFilePath);
+        _lastConversionResult = conversionResult;
+
+        if (conversionResult.IsSuccess)
+        {
+            _navigationContext = _folderNavigationService.ResolveContext(_currentResult.FilePath);
+        }
+
+        NotifyAllStatePropertiesChanged();
+        return conversionResult;
+    }
+
+    public bool OpenConvertedFile()
+    {
+        if (!CanOpenConvertedFile || string.IsNullOrWhiteSpace(_lastConversionResult.OutputFilePath))
+        {
+            return false;
+        }
+
+        var outputPath = _lastConversionResult.OutputFilePath;
+        var opened = OpenFile(outputPath);
+        return opened.State == PreviewStateKind.ImageLoaded;
+    }
+
+    public void DismissConversionNotice()
+    {
+        if (!HasConversionNotice)
+        {
+            return;
+        }
+
+        _lastConversionResult = ImageConversionResult.None();
+        NotifyAllStatePropertiesChanged();
     }
 
     public bool MoveNextImage()
@@ -530,6 +791,18 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         NotifyAllStatePropertiesChanged();
     }
 
+    private static Win32FileDialogService CreateDefaultDialogService() => new();
+
+    private static ImageFormatKind GetSuggestedTargetFormat(
+        ImageFormatKind loadedFormat,
+        ImageFormatKind fallbackFormat) => loadedFormat switch
+    {
+        ImageFormatKind.Jpeg => ImageFormatKind.Png,
+        ImageFormatKind.Png => ImageFormatKind.Jpeg,
+        ImageFormatKind.Bmp => ImageFormatKind.Png,
+        _ => SupportedFileFormats.IsConvertibleFormat(fallbackFormat) ? fallbackFormat : ImageFormatKind.Png,
+    };
+
     private static string FormatFileSize(long bytes)
     {
         if (bytes < 1024)
@@ -557,5 +830,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _toggleFitToWindowCommand.RaiseCanExecuteChanged();
         _rotateClockwiseCommand.RaiseCanExecuteChanged();
         _rotateCounterClockwiseCommand.RaiseCanExecuteChanged();
+        _convertImageCommand.RaiseCanExecuteChanged();
+        _openConvertedFileCommand.RaiseCanExecuteChanged();
+        _dismissConversionNoticeCommand.RaiseCanExecuteChanged();
     }
 }

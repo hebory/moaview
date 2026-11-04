@@ -27,6 +27,22 @@ public sealed class MainWindowUiTests
             _paths.Count > 0 ? _paths.Dequeue() : null;
     }
 
+    private sealed class SequenceSaveFileDialogService(params string?[] paths) : ISaveFileDialogService
+    {
+        private readonly Queue<string?> _paths = new(paths);
+
+        public int CallCount { get; private set; }
+
+        public string? PickSaveFile(
+            string suggestedFilePath,
+            ImageFormatKind targetFormat,
+            Window? owner = null)
+        {
+            CallCount++;
+            return _paths.Count > 0 ? _paths.Dequeue() : suggestedFilePath;
+        }
+    }
+
     [Fact]
     public void MainWindow_ShownWindowTransitionsAcrossEmptyImageUnsupportedAndErrorStates()
     {
@@ -586,6 +602,405 @@ public sealed class MainWindowUiTests
                 Assert.True(window.VerifyRenderedState());
                 Assert.Equal(gifPath, viewModel.CurrentResult.FilePath);
                 Assert.Equal("5 / 6", folderPositionText.Text);
+            }
+            finally
+            {
+                window.Close();
+                FlushDispatcher();
+            }
+        });
+    }
+
+    [Fact]
+    public void MainWindow_ImageConversionFlow_ConvertsAcrossJpegPngBmpAndReopensVerifiedOutputs()
+    {
+        using var temp = new TempTestDirectory();
+        var red = Color.FromRgb(220, 45, 45);
+        var green = Color.FromRgb(45, 190, 75);
+        var blue = Color.FromRgb(45, 95, 225);
+        var yellow = Color.FromRgb(235, 200, 40);
+
+        var sourcePngPath = SampleImageFactory.WriteQuadrantImage(
+            temp.GetPath("01_source.png"),
+            ImageFormatKind.Png,
+            width: 120,
+            height: 80,
+            topLeft: red,
+            topRight: green,
+            bottomRight: blue,
+            bottomLeft: yellow);
+        var originalPngBytes = File.ReadAllBytes(sourcePngPath);
+
+        var outBmpPath = temp.GetPath("02_from_png.bmp");
+        var outJpgPath = temp.GetPath("03_from_bmp.jpg");
+        var outPngPath = temp.GetPath("04_from_jpg.png");
+        var outJpgFromPngPath = temp.GetPath("05_from_png.jpg");
+        var outBmpFromJpgPath = temp.GetPath("06_from_jpg.bmp");
+        var outPngFromBmpPath = temp.GetPath("07_from_bmp.png");
+
+        StaTestRunner.Run(() =>
+        {
+            var openDialog = new SequenceFileDialogService();
+            var saveDialog = new SequenceSaveFileDialogService(
+                outBmpPath,
+                outJpgPath,
+                outPngPath,
+                outJpgFromPngPath,
+                outBmpFromJpgPath,
+                outPngFromBmpPath);
+            var viewModel = new MainWindowViewModel(
+                new ImagePreviewService(),
+                openDialog,
+                saveDialog);
+            viewModel.OpenFile(sourcePngPath);
+
+            var window = new MainWindow(viewModel);
+            try
+            {
+                ShowWindowForTest(window);
+
+                var formatCombo = (ComboBox)window.FindName("ConvertFormatComboBox")!;
+                var convertButton = (Button)window.FindName("ConvertImageButton")!;
+                var conversionBanner = (Border)window.FindName("ConversionNoticeBanner")!;
+                var conversionBadge = (TextBlock)window.FindName("ConversionNoticeBadgeText")!;
+                var openConvertedButton = (Button)window.FindName("OpenConvertedFileButton")!;
+                var previewImage = (Image)window.FindName("PreviewImage")!;
+                var metadataText = (TextBlock)window.FindName("ImageMetadataText")!;
+                var folderPositionText = (TextBlock)window.FindName("FolderPositionText")!;
+
+                Assert.True(window.VerifyRenderedState());
+                Assert.False(conversionBanner.IsVisible);
+                Assert.True(formatCombo.IsEnabled);
+                Assert.True(convertButton.IsEnabled);
+                Assert.Equal(3, formatCombo.Items.Count);
+                Assert.Equal("1 / 1", folderPositionText.Text);
+
+                // 보기 회전·확대 조작 후에도 원본 해상도(120x80) 기준으로 정확히 변환 저장되는지 함께 검증 (C4 + C5)
+                viewModel.RotateClockwise();
+                viewModel.ZoomIn();
+                PumpAndRender(window);
+                Assert.True(window.VerifyRenderedState());
+
+                // 1) PNG -> BMP 변환 후 '결과 파일 열기' 버튼으로 실제 창에 다시 열어 출력 형식·해상도·픽셀 검증
+                formatCombo.SelectedItem = viewModel.AvailableConversionFormats.Single(o => o.Format == ImageFormatKind.Bmp);
+                PumpAndRender(window);
+
+                convertButton.Command.Execute(convertButton.CommandParameter);
+                PumpAndRender(window);
+
+                Assert.True(window.VerifyRenderedState());
+                Assert.True(conversionBanner.IsVisible);
+                Assert.Equal("변환 완료", conversionBadge.Text);
+                Assert.True(openConvertedButton.IsVisible);
+                Assert.Equal("1 / 2", folderPositionText.Text);
+
+                openConvertedButton.Command.Execute(null);
+                PumpAndRender(window);
+
+                Assert.True(window.VerifyRenderedState());
+                Assert.False(conversionBanner.IsVisible);
+                Assert.Equal(outBmpPath, viewModel.CurrentResult.FilePath);
+                Assert.Equal(ImageFormatKind.Bmp, viewModel.CurrentResult.ImageFormat);
+                var reopenedBmp = Assert.IsAssignableFrom<BitmapSource>(previewImage.Source);
+                Assert.Equal(120, reopenedBmp.PixelWidth);
+                Assert.Equal(80, reopenedBmp.PixelHeight);
+                Assert.Equal(red, SampleImageFactory.ReadPixelColor(reopenedBmp, x: 25, y: 20));
+                Assert.Equal(green, SampleImageFactory.ReadPixelColor(reopenedBmp, x: 95, y: 20));
+                Assert.Equal(blue, SampleImageFactory.ReadPixelColor(reopenedBmp, x: 95, y: 60));
+                Assert.Equal(yellow, SampleImageFactory.ReadPixelColor(reopenedBmp, x: 25, y: 60));
+                Assert.Contains("BMP", metadataText.Text, StringComparison.Ordinal);
+                Assert.Contains("120 × 80 px", metadataText.Text, StringComparison.Ordinal);
+
+                // 2) BMP -> JPEG 변환 (Ctrl+Shift+S 단축키) 후 결과 파일 다시 열기 검증
+                formatCombo.SelectedItem = viewModel.AvailableConversionFormats.Single(o => o.Format == ImageFormatKind.Jpeg);
+                PumpAndRender(window);
+
+                Assert.True(window.HandleKeyInput(Key.S, ModifierKeys.Control | ModifierKeys.Shift));
+                PumpAndRender(window);
+
+                Assert.True(window.VerifyRenderedState());
+                Assert.True(conversionBanner.IsVisible);
+                Assert.Equal("변환 완료", conversionBadge.Text);
+                Assert.True(openConvertedButton.IsVisible);
+
+                openConvertedButton.Command.Execute(null);
+                PumpAndRender(window);
+
+                Assert.True(window.VerifyRenderedState());
+                Assert.Equal(outJpgPath, viewModel.CurrentResult.FilePath);
+                Assert.Equal(ImageFormatKind.Jpeg, viewModel.CurrentResult.ImageFormat);
+                var reopenedJpg = Assert.IsAssignableFrom<BitmapSource>(previewImage.Source);
+                Assert.Equal(120, reopenedJpg.PixelWidth);
+                Assert.Equal(80, reopenedJpg.PixelHeight);
+                Assert.Contains("JPEG", metadataText.Text, StringComparison.Ordinal);
+                Assert.Contains("120 × 80 px", metadataText.Text, StringComparison.Ordinal);
+
+                // 3) JPEG -> PNG 변환 (기본 추천 형식 PNG) 후 결과 파일 다시 열기 확인
+                Assert.Equal(ImageFormatKind.Png, viewModel.SelectedConversionFormat);
+                convertButton.Command.Execute(convertButton.CommandParameter);
+                PumpAndRender(window);
+
+                Assert.True(window.VerifyRenderedState());
+                Assert.Equal("3 / 4", folderPositionText.Text);
+
+                openConvertedButton.Command.Execute(null);
+                PumpAndRender(window);
+
+                Assert.True(window.VerifyRenderedState());
+                Assert.Equal(outPngPath, viewModel.CurrentResult.FilePath);
+                Assert.Equal(ImageFormatKind.Png, viewModel.CurrentResult.ImageFormat);
+                var reopenedPng = Assert.IsAssignableFrom<BitmapSource>(previewImage.Source);
+                Assert.Equal(120, reopenedPng.PixelWidth);
+                Assert.Equal(80, reopenedPng.PixelHeight);
+                Assert.Contains("PNG", metadataText.Text, StringComparison.Ordinal);
+                Assert.Equal("4 / 4", folderPositionText.Text);
+
+                // 4) PNG -> JPEG 변환 (기본 추천 형식 JPEG) 후 결과 파일 다시 열기 검증
+                Assert.Equal(ImageFormatKind.Jpeg, viewModel.SelectedConversionFormat);
+                convertButton.Command.Execute(convertButton.CommandParameter);
+                PumpAndRender(window);
+                Assert.True(window.VerifyRenderedState());
+
+                openConvertedButton.Command.Execute(null);
+                PumpAndRender(window);
+                Assert.True(window.VerifyRenderedState());
+                Assert.Equal(outJpgFromPngPath, viewModel.CurrentResult.FilePath);
+                Assert.Equal(ImageFormatKind.Jpeg, viewModel.CurrentResult.ImageFormat);
+                var reopenedJpgFromPng = Assert.IsAssignableFrom<BitmapSource>(previewImage.Source);
+                Assert.Equal(120, reopenedJpgFromPng.PixelWidth);
+                Assert.Equal(80, reopenedJpgFromPng.PixelHeight);
+
+                // 5) JPEG -> BMP 변환 후 결과 파일 다시 열기 검증
+                formatCombo.SelectedItem = viewModel.AvailableConversionFormats.Single(o => o.Format == ImageFormatKind.Bmp);
+                PumpAndRender(window);
+                convertButton.Command.Execute(convertButton.CommandParameter);
+                PumpAndRender(window);
+                Assert.True(window.VerifyRenderedState());
+
+                openConvertedButton.Command.Execute(null);
+                PumpAndRender(window);
+                Assert.True(window.VerifyRenderedState());
+                Assert.Equal(outBmpFromJpgPath, viewModel.CurrentResult.FilePath);
+                Assert.Equal(ImageFormatKind.Bmp, viewModel.CurrentResult.ImageFormat);
+                var reopenedBmpFromJpg = Assert.IsAssignableFrom<BitmapSource>(previewImage.Source);
+                Assert.Equal(120, reopenedBmpFromJpg.PixelWidth);
+                Assert.Equal(80, reopenedBmpFromJpg.PixelHeight);
+
+                // 6) BMP -> PNG 변환 (기본 추천 형식 PNG) 후 결과 파일 다시 열기 검증
+                Assert.Equal(ImageFormatKind.Png, viewModel.SelectedConversionFormat);
+                convertButton.Command.Execute(convertButton.CommandParameter);
+                PumpAndRender(window);
+                Assert.True(window.VerifyRenderedState());
+
+                openConvertedButton.Command.Execute(null);
+                PumpAndRender(window);
+                Assert.True(window.VerifyRenderedState());
+                Assert.Equal(outPngFromBmpPath, viewModel.CurrentResult.FilePath);
+                Assert.Equal(ImageFormatKind.Png, viewModel.CurrentResult.ImageFormat);
+                var reopenedPngFromBmp = Assert.IsAssignableFrom<BitmapSource>(previewImage.Source);
+                Assert.Equal(120, reopenedPngFromBmp.PixelWidth);
+                Assert.Equal(80, reopenedPngFromBmp.PixelHeight);
+                Assert.Equal("7 / 7", folderPositionText.Text);
+
+                // 최초 원본 PNG 파일 바이트가 전체 흐름 이후에도 전혀 변경되지 않았음을 확인합니다.
+                Assert.Equal(originalPngBytes, File.ReadAllBytes(sourcePngPath));
+            }
+            finally
+            {
+                window.Close();
+                FlushDispatcher();
+            }
+        });
+    }
+
+    [Fact]
+    public void MainWindow_ImageConversionProtectionAndFailureHandling_PrechecksUnsupportedProtectsOriginalAndCleansFailedOutput()
+    {
+        using var temp = new TempTestDirectory();
+        var gifPath = SampleImageFactory.WriteValidImage(temp.GetPath("01_preview_only.gif"), ImageFormatKind.Gif, 64, 48);
+        var tiffPath = SampleImageFactory.WriteValidImage(temp.GetPath("02_preview_only.tiff"), ImageFormatKind.Tiff, 64, 48);
+        var webpPath = temp.GetPath("03_unsupported.webp");
+        File.WriteAllText(webpPath, "RIFF....WEBP");
+        var corruptedPngPath = temp.GetPath("04_corrupted.png");
+        File.WriteAllBytes(corruptedPngPath, [0x89, 0x50, 0x4E, 0x47, 0x00, 0xFF]);
+        var pngPath = SampleImageFactory.WriteValidImage(temp.GetPath("05_source.png"), ImageFormatKind.Png, 80, 60);
+        var originalPngBytes = File.ReadAllBytes(pngPath);
+        var existingOtherJpgPath = SampleImageFactory.WriteValidImage(temp.GetPath("06_existing_other.jpg"), ImageFormatKind.Jpeg, 32, 24);
+        var existingOtherJpgBytes = File.ReadAllBytes(existingOtherJpgPath);
+
+        var unsupportedTargetGifPath = temp.GetPath("rejected_output.gif");
+        var caseVariantSameSourcePath = Path.Combine(temp.DirectoryPath, "05_SOURCE.PNG");
+        var midWriteFailureTargetPath = temp.GetPath("failed_output.jpg");
+        var silentTruncatedTargetPath = temp.GetPath("silent_truncated_output.jpg");
+
+        var failureMode = 0;
+        var conversionService = new ImageConversionService((bitmap, format, stream) =>
+        {
+            if (failureMode == 1)
+            {
+                stream.Write([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10]);
+                stream.Flush();
+                throw new IOException("변환 출력 쓰기 중 오류 시뮬레이션");
+            }
+
+            if (failureMode == 2)
+            {
+                stream.Write([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10]);
+                stream.Flush();
+                return;
+            }
+
+            BitmapEncoder encoder = format switch
+            {
+                ImageFormatKind.Jpeg => new JpegBitmapEncoder { QualityLevel = 95 },
+                ImageFormatKind.Png => new PngBitmapEncoder(),
+                ImageFormatKind.Bmp => new BmpBitmapEncoder(),
+                _ => throw new NotSupportedException(),
+            };
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            encoder.Save(stream);
+        });
+
+        StaTestRunner.Run(() =>
+        {
+            var openDialog = new SequenceFileDialogService();
+            var saveDialog = new SequenceSaveFileDialogService(
+                unsupportedTargetGifPath,
+                caseVariantSameSourcePath,
+                existingOtherJpgPath,
+                midWriteFailureTargetPath,
+                silentTruncatedTargetPath);
+            var viewModel = new MainWindowViewModel(
+                new ImagePreviewService(),
+                openDialog,
+                saveDialog,
+                new FolderImageNavigationService(),
+                conversionService);
+
+            var window = new MainWindow(viewModel);
+            try
+            {
+                ShowWindowForTest(window);
+
+                var convertButton = (Button)window.FindName("ConvertImageButton")!;
+                var conversionBanner = (Border)window.FindName("ConversionNoticeBanner")!;
+                var conversionBadge = (TextBlock)window.FindName("ConversionNoticeBadgeText")!;
+                var conversionMessage = (TextBlock)window.FindName("ConversionNoticeMessageText")!;
+                var openConvertedButton = (Button)window.FindName("OpenConvertedFileButton")!;
+                var dismissBannerButton = (Button)window.FindName("DismissConversionNoticeButton")!;
+                var imageViewport = (Border)window.FindName("ImageViewport")!;
+                var noticePanel = (Border)window.FindName("NoticePanel")!;
+
+                // 1) 미지원 원본(GIF, TIFF, WEBP) 및 손상 원본은 저장 대화상자를 열기 전에 사전 차단·안내합니다.
+                viewModel.OpenFile(gifPath);
+                PumpAndRender(window);
+                convertButton.Command.Execute(convertButton.CommandParameter);
+                PumpAndRender(window);
+
+                Assert.Equal(0, saveDialog.CallCount);
+                Assert.True(window.VerifyRenderedState());
+                Assert.True(imageViewport.IsVisible);
+                Assert.True(conversionBanner.IsVisible);
+                Assert.Equal("변환 미지원", conversionBadge.Text);
+                Assert.Contains("GIF", conversionMessage.Text, StringComparison.Ordinal);
+                Assert.False(openConvertedButton.IsVisible);
+
+                viewModel.OpenFile(tiffPath);
+                PumpAndRender(window);
+                Assert.False(conversionBanner.IsVisible);
+                convertButton.Command.Execute(convertButton.CommandParameter);
+                PumpAndRender(window);
+
+                Assert.Equal(0, saveDialog.CallCount);
+                Assert.True(window.VerifyRenderedState());
+                Assert.True(conversionBanner.IsVisible);
+                Assert.Equal("변환 미지원", conversionBadge.Text);
+                Assert.Contains("TIFF", conversionMessage.Text, StringComparison.Ordinal);
+
+                viewModel.OpenFile(webpPath);
+                PumpAndRender(window);
+                convertButton.Command.Execute(convertButton.CommandParameter);
+                PumpAndRender(window);
+
+                Assert.Equal(0, saveDialog.CallCount);
+                Assert.True(window.VerifyRenderedState());
+                Assert.True(noticePanel.IsVisible);
+                Assert.True(conversionBanner.IsVisible);
+                Assert.Equal("변환 미지원", conversionBadge.Text);
+                Assert.Contains(".webp", conversionMessage.Text, StringComparison.OrdinalIgnoreCase);
+
+                viewModel.OpenFile(corruptedPngPath);
+                PumpAndRender(window);
+                convertButton.Command.Execute(convertButton.CommandParameter);
+                PumpAndRender(window);
+
+                Assert.Equal(0, saveDialog.CallCount);
+                Assert.True(window.VerifyRenderedState());
+                Assert.True(noticePanel.IsVisible);
+                Assert.True(conversionBanner.IsVisible);
+                Assert.Equal("변환 실패", conversionBadge.Text);
+
+                // 2) 유효한 PNG에서 미지원 출력 확장자(.gif) 지정 시 파일 생성 전에 차단 및 안내합니다.
+                viewModel.OpenFile(pngPath);
+                PumpAndRender(window);
+                convertButton.Command.Execute(convertButton.CommandParameter);
+                PumpAndRender(window);
+
+                Assert.Equal(1, saveDialog.CallCount);
+                Assert.True(window.VerifyRenderedState());
+                Assert.True(conversionBanner.IsVisible);
+                Assert.Equal("변환 미지원", conversionBadge.Text);
+                Assert.False(File.Exists(unsupportedTargetGifPath));
+
+                // 3) 원본과 동일한 파일 경로(대소문자 다른 경로 포함) 및 이미 존재하는 다른 파일 덮어쓰기를 차단합니다.
+                convertButton.Command.Execute(convertButton.CommandParameter);
+                PumpAndRender(window);
+
+                Assert.Equal(2, saveDialog.CallCount);
+                Assert.True(window.VerifyRenderedState());
+                Assert.True(conversionBanner.IsVisible);
+                Assert.Equal("원본 보호", conversionBadge.Text);
+                Assert.Equal(originalPngBytes, File.ReadAllBytes(pngPath));
+
+                convertButton.Command.Execute(convertButton.CommandParameter);
+                PumpAndRender(window);
+
+                Assert.Equal(3, saveDialog.CallCount);
+                Assert.True(window.VerifyRenderedState());
+                Assert.True(conversionBanner.IsVisible);
+                Assert.Equal("원본 보호", conversionBadge.Text);
+                Assert.Equal(existingOtherJpgBytes, File.ReadAllBytes(existingOtherJpgPath));
+
+                // 4) 인코딩 쓰기 도중 예외 발생 또는 잘린 파일 생성 시 불완전 결과 파일을 삭제하고 실패 안내를 표시합니다.
+                failureMode = 1;
+                convertButton.Command.Execute(convertButton.CommandParameter);
+                PumpAndRender(window);
+
+                Assert.Equal(4, saveDialog.CallCount);
+                Assert.True(window.VerifyRenderedState());
+                Assert.True(imageViewport.IsVisible);
+                Assert.True(conversionBanner.IsVisible);
+                Assert.Equal("변환 실패", conversionBadge.Text);
+                Assert.False(openConvertedButton.IsVisible);
+                Assert.False(File.Exists(midWriteFailureTargetPath));
+                Assert.Empty(Directory.GetFiles(temp.DirectoryPath, "*.tmp"));
+
+                failureMode = 2;
+                convertButton.Command.Execute(convertButton.CommandParameter);
+                PumpAndRender(window);
+
+                Assert.Equal(5, saveDialog.CallCount);
+                Assert.True(window.VerifyRenderedState());
+                Assert.True(conversionBanner.IsVisible);
+                Assert.Equal("변환 실패", conversionBadge.Text);
+                Assert.False(openConvertedButton.IsVisible);
+                Assert.False(File.Exists(silentTruncatedTargetPath));
+                Assert.Empty(Directory.GetFiles(temp.DirectoryPath, "*.tmp"));
+
+                dismissBannerButton.Command.Execute(null);
+                PumpAndRender(window);
+                Assert.False(conversionBanner.IsVisible);
+                Assert.True(window.VerifyRenderedState());
             }
             finally
             {

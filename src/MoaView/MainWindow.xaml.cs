@@ -50,6 +50,17 @@ public partial class MainWindow : Window
             return false;
         }
 
+        var conversionBannerValid = ViewModel.HasConversionNotice
+            ? ConversionNoticeBanner.IsVisible &&
+              ConversionNoticeBadgeText.IsVisible &&
+              ConversionNoticeMessageText.IsVisible &&
+              (ViewModel.CanOpenConvertedFile == OpenConvertedFileButton.IsVisible)
+            : !ConversionNoticeBanner.IsVisible;
+        if (!conversionBannerValid)
+        {
+            return false;
+        }
+
         return ViewModel.State switch
         {
             PreviewStateKind.Empty =>
@@ -110,6 +121,7 @@ public partial class MainWindow : Window
             return key switch
             {
                 Key.R => ExecuteIfPossible(ViewModel.RotateCounterClockwiseCommand),
+                Key.S => ExecuteIfPossible(ViewModel.ConvertImageCommand, this),
                 _ => false,
             };
         }

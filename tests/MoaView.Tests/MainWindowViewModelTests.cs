@@ -11,11 +11,27 @@ namespace MoaView.Tests;
 
 public sealed class MainWindowViewModelTests
 {
-    private sealed class StubFileDialogService : IFileDialogService
+    private sealed class StubFileDialogService : IFileDialogService, ISaveFileDialogService
     {
         public string? NextFilePath { get; set; }
 
+        public string? NextSaveFilePath { get; set; }
+
+        public int PickSaveCallCount { get; private set; }
+
+        public string? LastSuggestedSavePath { get; private set; }
+
         public string? PickFile(Window? owner = null) => NextFilePath;
+
+        public string? PickSaveFile(
+            string suggestedFilePath,
+            ImageFormatKind targetFormat,
+            Window? owner = null)
+        {
+            PickSaveCallCount++;
+            LastSuggestedSavePath = suggestedFilePath;
+            return NextSaveFilePath;
+        }
     }
 
     [Fact]
@@ -32,6 +48,9 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("모아뷰 (MoaView)", vm.WindowTitle);
         Assert.Equal(SupportedFileFormats.SupportedFormatsShortText, vm.SupportedFormatsSummary);
         Assert.Equal(SupportedFileFormats.SupportedFormatsDetailText, vm.SupportedFormatsDetail);
+        Assert.Equal(
+            [ImageFormatKind.Png, ImageFormatKind.Jpeg, ImageFormatKind.Bmp],
+            vm.AvailableConversionFormats.Select(option => option.Format).ToArray());
         Assert.False(vm.ZoomInCommand.CanExecute(null));
         Assert.False(vm.ZoomOutCommand.CanExecute(null));
         Assert.False(vm.ActualSizeCommand.CanExecute(null));
@@ -40,6 +59,9 @@ public sealed class MainWindowViewModelTests
         Assert.False(vm.RotateCounterClockwiseCommand.CanExecute(null));
         Assert.False(vm.PreviousImageCommand.CanExecute(null));
         Assert.False(vm.NextImageCommand.CanExecute(null));
+        Assert.False(vm.ConvertImageCommand.CanExecute(null));
+        Assert.False(vm.OpenConvertedFileCommand.CanExecute(null));
+        Assert.False(vm.HasConversionNotice);
     }
 
     [Fact]
@@ -249,5 +271,72 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(0, vm.RotationDegrees);
         Assert.True(vm.IsFitToWindow);
         Assert.Equal(1.0, vm.ZoomFactor);
+    }
+
+    [Fact]
+    public void ConvertCommands_PrecheckUnsupportedFormatsBeforeSaveDialogAndReopenConvertedImage()
+    {
+        using var temp = new TempTestDirectory();
+        var gifPath = SampleImageFactory.WriteValidImage(
+            temp.GetPath("01_anim.gif"),
+            ImageFormatKind.Gif,
+            width: 44,
+            height: 28);
+        var pngPath = SampleImageFactory.WriteValidImage(
+            temp.GetPath("02_photo.png"),
+            ImageFormatKind.Png,
+            width: 72,
+            height: 54);
+
+        var dialog = new StubFileDialogService();
+        var vm = new MainWindowViewModel(new ImagePreviewService(), dialog);
+
+        // 1) GIF는 미리보기는 가능하지만 변환은 미지원 -> 저장 대화상자를 열기 전에 사전 안내되어야 함
+        vm.OpenFile(gifPath);
+        Assert.True(vm.IsImageVisible);
+        Assert.False(vm.CanConvertLoadedFormat);
+        Assert.True(vm.ConvertImageCommand.CanExecute(null));
+
+        vm.ConvertImageCommand.Execute(null);
+        Assert.Equal(0, dialog.PickSaveCallCount);
+        Assert.Equal(ConversionStatusKind.UnsupportedCombination, vm.ConversionStatus);
+        Assert.True(vm.HasConversionNotice);
+        Assert.Equal("변환 미지원", vm.ConversionNoticeBadgeText);
+        Assert.Contains("GIF", vm.ConversionNoticeMessage, StringComparison.Ordinal);
+        Assert.True(vm.IsImageVisible);
+
+        // 2) PNG 열기 시 이전 배너가 초기화되고 기본 목표 형식이 JPEG로 설정됨
+        vm.OpenFile(pngPath);
+        Assert.False(vm.HasConversionNotice);
+        Assert.True(vm.CanConvertLoadedFormat);
+        Assert.Equal(ImageFormatKind.Jpeg, vm.SelectedConversionFormat);
+        Assert.Equal("2 / 2", vm.FolderPositionDisplay);
+
+        // 3) 저장 대화상자 취소 시 아무 파일도 생성하지 않고 배너도 표시하지 않음
+        dialog.NextSaveFilePath = null;
+        vm.ConvertImageCommand.Execute(null);
+        Assert.Equal(1, dialog.PickSaveCallCount);
+        Assert.EndsWith("02_photo.jpg", dialog.LastSuggestedSavePath, StringComparison.OrdinalIgnoreCase);
+        Assert.False(vm.HasConversionNotice);
+
+        // 4) 정상 경로 지정 시 변환 완료 배너, 폴더 탐색 개수 갱신(2 -> 3), 결과 파일 열기 동작 확인
+        var convertedJpgPath = temp.GetPath("03_converted.jpg");
+        dialog.NextSaveFilePath = convertedJpgPath;
+        vm.ConvertImageCommand.Execute(null);
+
+        Assert.Equal(2, dialog.PickSaveCallCount);
+        Assert.Equal(ConversionStatusKind.Succeeded, vm.ConversionStatus);
+        Assert.Equal("변환 완료", vm.ConversionNoticeBadgeText);
+        Assert.True(vm.CanOpenConvertedFile);
+        Assert.True(vm.OpenConvertedFileCommand.CanExecute(null));
+        Assert.Equal("2 / 3", vm.FolderPositionDisplay);
+
+        vm.OpenConvertedFileCommand.Execute(null);
+        Assert.Equal(PreviewStateKind.ImageLoaded, vm.State);
+        Assert.Equal(convertedJpgPath, vm.CurrentResult.FilePath);
+        Assert.Equal(ImageFormatKind.Jpeg, vm.CurrentResult.ImageFormat);
+        Assert.Equal(72, vm.CurrentResult.PixelWidth);
+        Assert.Equal(54, vm.CurrentResult.PixelHeight);
+        Assert.False(vm.HasConversionNotice);
     }
 }

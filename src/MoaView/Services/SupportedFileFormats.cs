@@ -22,10 +22,33 @@ public static class SupportedFileFormats
     public static IReadOnlyCollection<string> SupportedImageExtensions =>
         [".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff"];
 
-    public const string SupportedFormatsShortText = "지원 이미지: JPEG, PNG, BMP, GIF, TIFF";
+    public static IReadOnlyCollection<string> ConvertibleImageExtensions =>
+        [".jpg", ".jpeg", ".png", ".bmp"];
+
+    public static IReadOnlyList<ImageFormatKind> ConvertibleImageFormats { get; } =
+    [
+        ImageFormatKind.Png,
+        ImageFormatKind.Jpeg,
+        ImageFormatKind.Bmp,
+    ];
+
+    public static IReadOnlyList<ConversionFormatOption> ConvertibleFormatOptions { get; } =
+    [
+        new(ImageFormatKind.Png, "PNG (.png)", ".png"),
+        new(ImageFormatKind.Jpeg, "JPEG (.jpg)", ".jpg"),
+        new(ImageFormatKind.Bmp, "BMP (.bmp)", ".bmp"),
+    ];
+
+    public const string SupportedFormatsShortText =
+        "지원 이미지: JPEG, PNG, BMP, GIF, TIFF · 변환: JPEG, PNG, BMP";
 
     public const string SupportedFormatsDetailText =
-        "지원 이미지 형식: JPEG (.jpg, .jpeg), PNG (.png), BMP (.bmp), GIF (.gif), TIFF (.tif, .tiff)";
+        "지원 이미지 형식: JPEG (.jpg, .jpeg), PNG (.png), BMP (.bmp), GIF (.gif), TIFF (.tif, .tiff) · 이미지 변환: JPEG, PNG, BMP 상호 변환";
+
+    public const string SupportedConversionShortText = "변환 지원: JPEG, PNG, BMP";
+
+    public const string SupportedConversionDetailText =
+        "이미지 변환 지원 형식: JPEG (.jpg, .jpeg), PNG (.png), BMP (.bmp) 상호 변환";
 
     public const string OpenFileDialogFilter =
         "모든 파일 (*.*)|*.*|지원 이미지 (*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tif;*.tiff)|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tif;*.tiff";
@@ -41,6 +64,43 @@ public static class SupportedFileFormats
         var normalized = extension.StartsWith('.') ? extension : $".{extension}";
         return ExtensionMap.TryGetValue(normalized, out format);
     }
+
+    public static bool IsConvertibleFormat(ImageFormatKind format) =>
+        format is ImageFormatKind.Jpeg or ImageFormatKind.Png or ImageFormatKind.Bmp;
+
+    public static bool TryGetConvertibleFormatByExtension(string? extension, out ImageFormatKind format)
+    {
+        if (TryGetImageFormatByExtension(extension, out format) && IsConvertibleFormat(format))
+        {
+            return true;
+        }
+
+        format = default;
+        return false;
+    }
+
+    public static bool IsMatchingExtensionForFormat(string? extension, ImageFormatKind format) =>
+        TryGetImageFormatByExtension(extension, out var extFormat) && extFormat == format;
+
+    public static string GetDefaultExtension(ImageFormatKind format) => format switch
+    {
+        ImageFormatKind.Jpeg => ".jpg",
+        ImageFormatKind.Png => ".png",
+        ImageFormatKind.Bmp => ".bmp",
+        ImageFormatKind.Gif => ".gif",
+        ImageFormatKind.Tiff => ".tiff",
+        _ => throw new ArgumentOutOfRangeException(nameof(format), format, null),
+    };
+
+    public static string BuildSaveDialogFilter(ImageFormatKind preferredFormat) => preferredFormat switch
+    {
+        ImageFormatKind.Jpeg =>
+            "JPEG 이미지 (*.jpg;*.jpeg)|*.jpg;*.jpeg|PNG 이미지 (*.png)|*.png|BMP 이미지 (*.bmp)|*.bmp",
+        ImageFormatKind.Bmp =>
+            "BMP 이미지 (*.bmp)|*.bmp|PNG 이미지 (*.png)|*.png|JPEG 이미지 (*.jpg;*.jpeg)|*.jpg;*.jpeg",
+        _ =>
+            "PNG 이미지 (*.png)|*.png|JPEG 이미지 (*.jpg;*.jpeg)|*.jpg;*.jpeg|BMP 이미지 (*.bmp)|*.bmp",
+    };
 
     public static string GetDisplayName(ImageFormatKind format) => format switch
     {
@@ -61,4 +121,25 @@ public static class SupportedFileFormats
 
         return $"선택한 형식('{extension}')은 현재 미리보기를 지원하지 않습니다. {SupportedFormatsDetailText}.";
     }
+
+    public static string BuildUnsupportedConversionSourceMessage(ImageFormatKind sourceFormat) =>
+        $"현재 이미지 형식({GetDisplayName(sourceFormat)})은 미리보기만 지원하며 이미지 변환은 지원하지 않습니다. {SupportedConversionDetailText}.";
+
+    public static string BuildUnsupportedConversionSourceExtensionMessage(string? extension)
+    {
+        if (string.IsNullOrWhiteSpace(extension))
+        {
+            return $"확장자가 없는 파일은 변환 형식을 확인할 수 없어 이미지 변환을 지원하지 않습니다. {SupportedConversionDetailText}.";
+        }
+
+        if (TryGetImageFormatByExtension(extension, out var previewOnlyFormat) && !IsConvertibleFormat(previewOnlyFormat))
+        {
+            return BuildUnsupportedConversionSourceMessage(previewOnlyFormat);
+        }
+
+        return $"선택한 원본 형식('{extension}')은 이미지 변환을 지원하지 않습니다. {SupportedConversionDetailText}.";
+    }
+
+    public static string BuildUnsupportedConversionTargetMessage(string targetDescription) =>
+        $"지정한 출력 형식('{targetDescription}')으로의 변환은 지원하지 않습니다. {SupportedConversionDetailText}.";
 }
