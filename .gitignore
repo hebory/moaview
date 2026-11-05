@@ -5,3 +5,6 @@ obj/
 TestResults/
 *.user
 *.suo
+artifacts/
+.tools/
+src/MoaView.ExplorerCommand/MoaView..*/
