@@ -20,6 +20,6 @@
     <_MoaLocalSources Condition="'$(_MoaSdkOfflinePackages)' != ''">$(_MoaLocalSources);$(_MoaSdkOfflinePackages)</_MoaLocalSources>
 
     <RestoreAdditionalProjectSources Condition="'$(RestoreSources)' != '' and '$(_MoaLocalSources)' != ''">$(RestoreAdditionalProjectSources);$(_MoaLocalSources)</RestoreAdditionalProjectSources>
-    <RestoreSources Condition="'$(RestoreSources)' == '' and '$(_MoaUserNuGetCache)' != '' and Exists('$(_MoaUserNuGetCache)\xunit\2.5.3') and Exists('$(_MoaUserNuGetCache)\microsoft.net.test.sdk\17.8.0') and Exists('$(_MoaUserNuGetCache)\xunit.runner.visualstudio\2.5.3')">$(_MoaLocalSources)</RestoreSources>
+    <RestoreSources Condition="'$(RestoreSources)' == '' and '$(_MoaUserNuGetCache)' != '' and Exists('$(_MoaUserNuGetCache)\xunit\2.5.3') and Exists('$(_MoaUserNuGetCache)\microsoft.net.test.sdk\17.8.0') and Exists('$(_MoaUserNuGetCache)\xunit.runner.visualstudio\2.5.3') and Exists('$(_MoaUserNuGetCache)\microsoft.web.webview2\1.0.4314.35') and Exists('$(_MoaUserNuGetCache)\markdig\1.5.1')">$(_MoaLocalSources)</RestoreSources>
   </PropertyGroup>
 </Project>

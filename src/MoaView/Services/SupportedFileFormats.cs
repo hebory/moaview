@@ -40,10 +40,10 @@ public static class SupportedFileFormats
     ];
 
     public const string SupportedFormatsShortText =
-        "지원 이미지: JPEG, PNG, BMP, GIF, TIFF · 변환: JPEG, PNG, BMP";
+        "지원 이미지: JPEG, PNG, BMP, GIF, TIFF · ZIP · 문서 · Rive · PureRef";
 
     public const string SupportedFormatsDetailText =
-        "지원 이미지 형식: JPEG (.jpg, .jpeg), PNG (.png), BMP (.bmp), GIF (.gif), TIFF (.tif, .tiff) · 이미지 변환: JPEG, PNG, BMP 상호 변환";
+        "이미지: JPEG, PNG, BMP, GIF, TIFF · ZIP 내부 이미지/텍스트 · DOCX, XLSX, PPTX, HWP 5.x, HWPX 내용 · RIV 애니메이션 · PUR 포함 PNG/JPEG · UTF-8/Unicode 텍스트 · 이미지 변환: JPEG, PNG, BMP";
 
     public const string SupportedConversionShortText = "변환 지원: JPEG, PNG, BMP";
 
@@ -51,7 +51,7 @@ public static class SupportedFileFormats
         "이미지 변환 지원 형식: JPEG (.jpg, .jpeg), PNG (.png), BMP (.bmp) 상호 변환";
 
     public const string OpenFileDialogFilter =
-        "모든 파일 (*.*)|*.*|지원 이미지 (*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tif;*.tiff)|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tif;*.tiff";
+        "모든 지원 파일|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tif;*.tiff;*.zip;*.docx;*.xlsx;*.pptx;*.hwp;*.hwpx;*.riv;*.pur;*.txt;*.md;*.csv;*.tsv;*.json;*.xml;*.log|모든 파일 (*.*)|*.*|이미지|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tif;*.tiff|ZIP 압축파일|*.zip|문서 내용|*.docx;*.xlsx;*.pptx;*.hwp;*.hwpx|Rive 애니메이션|*.riv|PureRef 포함 이미지|*.pur|텍스트|*.txt;*.md;*.csv;*.tsv;*.json;*.xml;*.log;*.yaml;*.yml;*.ini;*.cs;*.js;*.ts;*.py;*.html;*.css";
 
     public static bool TryGetImageFormatByExtension(string? extension, out ImageFormatKind format)
     {

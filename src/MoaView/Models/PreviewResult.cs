@@ -18,11 +18,18 @@ public sealed record PreviewResult
     public long FileSizeBytes { get; init; }
     public string Title { get; init; } = string.Empty;
     public string Message { get; init; } = string.Empty;
+    public ArchivePreview? Archive { get; init; }
+    public PurPreview? Pur { get; init; }
+    public PurImageEntry? PurImage { get; init; }
+    public string? ArchiveEntryName { get; init; }
+    public IReadOnlyList<DocumentSection> Sections { get; init; } = Array.Empty<DocumentSection>();
+    public byte[]? RiveData { get; init; }
+    public string ContentDescription { get; init; } = string.Empty;
 
     public static PreviewResult Empty() => new()
     {
         State = PreviewStateKind.Empty,
-        Title = "미리 볼 이미지 파일을 선택하세요",
+        Title = "미리 볼 파일을 선택하세요",
         Message = "상단의 '파일 선택...' 버튼을 누르거나 실행 인수로 파일 경로를 전달하면 미리보기를 표시합니다.",
     };
 

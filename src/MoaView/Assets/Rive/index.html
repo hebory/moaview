@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' blob: data:; font-src 'self' blob: data:; media-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'">
+  <link rel="stylesheet" href="viewer.css">
+  <script src="vendor/rive.js" defer></script>
+  <script src="viewer.js" defer></script>
+  <title>Rive 미리보기</title>
+</head>
+<body>
+  <header>
+    <label>아트보드 <select id="artboard" aria-label="아트보드"></select></label>
+    <label>재생 <select id="animation" aria-label="애니메이션 또는 상태 머신"></select></label>
+    <button id="pause" disabled>일시정지</button>
+    <button id="restart" disabled>처음부터</button>
+  </header>
+  <main><canvas id="canvas" aria-label="Rive 애니메이션"></canvas></main>
+  <footer id="status" role="status">Rive 파일을 준비하고 있습니다.</footer>
+</body>
+</html>

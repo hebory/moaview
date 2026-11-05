@@ -9,4 +9,7 @@ public enum PreviewStateKind
     ImageLoaded,
     UnsupportedFormat,
     Error,
+    ArchiveLoaded,
+    TextLoaded,
+    RiveLoaded,
 }

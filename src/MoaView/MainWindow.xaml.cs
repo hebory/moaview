@@ -3,6 +3,8 @@ using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using MoaView.Models;
 using MoaView.ViewModels;
+using MoaView.Controls;
+using System.ComponentModel;
 
 namespace MoaView;
 
@@ -14,26 +16,80 @@ public partial class MainWindow : Window
     private Point _panStartPoint;
     private double _panStartHorizontalOffset;
     private double _panStartVerticalOffset;
+    private RivePreviewControl? _rivePreview;
+    private byte[]? _riveData;
 
     public MainWindow()
         : this(new MainWindowViewModel())
     {
     }
 
-    public MainWindow(MainWindowViewModel viewModel)
+    public MainWindow(MainWindowViewModel viewModel, bool isExplorerPreview = false)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
 
         ViewModel = viewModel;
+        IsExplorerPreview = isExplorerPreview;
         DataContext = viewModel;
         InitializeComponent();
 
+        ExplorerIntegrationToggle.Visibility = isExplorerPreview ? Visibility.Collapsed : Visibility.Visible;
+        ExplorerPreviewHint.Visibility = isExplorerPreview ? Visibility.Visible : Visibility.Collapsed;
+        SupportedFormatsBanner.Visibility = isExplorerPreview ? Visibility.Collapsed : Visibility.Visible;
+
         ViewModel.ViewResetRequested += OnViewModelViewResetRequested;
-        Loaded += (_, _) => SyncViewportSize();
-        Closed += (_, _) => ViewModel.ViewResetRequested -= OnViewModelViewResetRequested;
+        ViewModel.PropertyChanged += OnPreviewContentChanged;
+        Loaded += (_, _) => { SyncViewportSize(); UpdateRivePreview(); };
+        Closed += (_, _) =>
+        {
+            ViewModel.ViewResetRequested -= OnViewModelViewResetRequested;
+            ViewModel.PropertyChanged -= OnPreviewContentChanged;
+            _rivePreview?.Dispose();
+        };
     }
 
     public MainWindowViewModel ViewModel { get; }
+
+    public bool IsExplorerPreview { get; }
+    public string RivePlaybackStatus => _rivePreview?.PlaybackStatus ?? "none";
+    public Task<bool> WaitForRivePreviewAsync() => _rivePreview?.Ready ?? Task.FromResult(false);
+
+    private void OnPreviewContentChanged(object? sender, PropertyChangedEventArgs e) => UpdateRivePreview();
+
+    private void UpdateRivePreview()
+    {
+        var data = ViewModel.IsRiveVisible ? ViewModel.CurrentResult.RiveData : null;
+        if (ReferenceEquals(data, _riveData)) return;
+        _riveData = data;
+        if (data is null)
+        {
+            _rivePreview?.Dispose();
+            _rivePreview = null;
+            RiveViewport.Children.Clear();
+            return;
+        }
+        if (_rivePreview is null)
+        {
+            _rivePreview = new RivePreviewControl();
+            _rivePreview.CloseRequested += (_, _) => { if (IsExplorerPreview) Close(); };
+            RiveViewport.Children.Add(_rivePreview);
+        }
+        _ = _rivePreview.LoadAsync(data);
+    }
+
+    public event EventHandler? ExplorerIntegrationToggleRequested;
+
+    public bool IsExplorerIntegrationRequested => ExplorerIntegrationToggle.IsChecked == true;
+
+    public void SetExplorerIntegrationState(bool enabled, string message)
+    {
+        ExplorerIntegrationToggle.IsChecked = enabled;
+        ExplorerIntegrationToggle.ToolTip = message;
+        ExplorerIntegrationToggle.Content = enabled ? "탐색기 Space 켜짐" : "탐색기 Space 꺼짐";
+    }
+
+    private void OnExplorerIntegrationToggleClick(object sender, RoutedEventArgs e) =>
+        ExplorerIntegrationToggleRequested?.Invoke(this, EventArgs.Empty);
 
     public bool VerifyRenderedState()
     {
@@ -70,7 +126,14 @@ public partial class MainWindow : Window
                 !NoticePanel.IsVisible &&
                 PreviewImage.Source is null,
             PreviewStateKind.ImageLoaded =>
-                VerifyLoadedImageRenderedState(),
+                VerifyLoadedImageRenderedState() && (!ViewModel.IsPurVisible ||
+                    PurPanel.IsVisible && PurImageList.IsVisible && Equals(PurImageList.SelectedItem, ViewModel.SelectedPurImage)),
+            PreviewStateKind.ArchiveLoaded => ArchivePanel.IsVisible && ArchivePlaceholder.IsVisible && PreviewImage.Source is null,
+            PreviewStateKind.TextLoaded => TextViewport.IsVisible &&
+                (ViewModel.IsMarkdownRendered ? MarkdownPreview.IsVisible && MarkdownPreview.Document is not null && MarkdownToolbar.IsVisible :
+                    PreviewText.IsVisible && PreviewText.Text == ViewModel.TextContent) && !ImageViewport.IsVisible && PreviewImage.Source is null,
+            PreviewStateKind.RiveLoaded => RiveViewport.IsVisible && RivePlaybackStatus is "ready" or "error" &&
+                !ImageViewport.IsVisible && PreviewImage.Source is null,
             PreviewStateKind.UnsupportedFormat or PreviewStateKind.Error =>
                 NoticePanel.IsVisible &&
                 NoticeTitleText.IsVisible &&
@@ -101,6 +164,12 @@ public partial class MainWindow : Window
 
     public bool HandleKeyInput(Key key, ModifierKeys modifiers = ModifierKeys.None)
     {
+        if (IsExplorerPreview && modifiers == ModifierKeys.None && key is Key.Space or Key.Escape)
+        {
+            Close();
+            return true;
+        }
+
         SyncViewportSize();
 
         if (modifiers == ModifierKeys.Control)
@@ -198,6 +267,25 @@ public partial class MainWindow : Window
     private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
     {
         var actualKey = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (MarkdownPreview.IsKeyboardFocusWithin && actualKey is not Key.Escape &&
+            (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Shift ||
+                Keyboard.Modifiers == ModifierKeys.Control && actualKey is Key.A or Key.C or Key.Home or Key.End))
+            return;
+        if (MarkdownThemePicker.IsKeyboardFocusWithin && actualKey is Key.Left or Key.Right or Key.Up or Key.Down or Key.Home or Key.End or Key.Space)
+            return;
+        if (MarkdownSourceToggle.IsKeyboardFocusWithin && actualKey == Key.Space) return;
+        if (e.OriginalSource is System.Windows.Controls.TextBox && actualKey is not Key.Escape && Keyboard.Modifiers != ModifierKeys.Control)
+            return;
+        if (ViewModel.IsArchiveVisible && ArchiveEntryList.IsKeyboardFocusWithin && actualKey is Key.Left or Key.Right or Key.Up or Key.Down or Key.PageUp or Key.PageDown or Key.Home or Key.End)
+            return;
+        if (ViewModel.IsPurVisible && PurImageList.IsKeyboardFocusWithin && actualKey is Key.Left or Key.Right or Key.Up or Key.Down or Key.PageUp or Key.PageDown or Key.Home or Key.End)
+            return;
+        if (IsExplorerPreview && e.IsRepeat && actualKey is Key.Space or Key.Escape)
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (HandleKeyInput(actualKey, Keyboard.Modifiers))
         {
             e.Handled = true;
@@ -219,6 +307,8 @@ public partial class MainWindow : Window
         CancelPanning();
         ImageScrollViewer.ScrollToHorizontalOffset(0);
         ImageScrollViewer.ScrollToVerticalOffset(0);
+        PreviewText.ScrollToHome();
+        MarkdownPreview.Document?.Blocks.FirstBlock?.BringIntoView();
     }
 
     private void SyncViewportSize()

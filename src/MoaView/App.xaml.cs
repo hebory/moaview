@@ -2,17 +2,20 @@ using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Threading;
+using MoaView.Services;
 using MoaView.ViewModels;
 
 namespace MoaView;
 
-public readonly record struct StartupOptions(string? InitialFilePath, bool VerifyStartupAndClose);
+public readonly record struct StartupOptions(string? InitialFilePath, bool VerifyStartupAndClose, bool PreviewOnly);
 
 public partial class App : Application
 {
     public const string VerifyStartupSwitch = "--verify-startup";
+    public const string PreviewSwitch = "--preview";
 
     private readonly IReadOnlyList<string> _startupArgs;
+    private ExplorerPreviewIntegration? _explorerIntegration;
 
     public App()
         : this(Array.Empty<string>())
@@ -45,7 +48,7 @@ public partial class App : Application
             viewModel.OpenFile(options.InitialFilePath);
         }
 
-        var mainWindow = new MainWindow(viewModel);
+        var mainWindow = new MainWindow(viewModel, isExplorerPreview: options.PreviewOnly);
         if (options.VerifyStartupAndClose)
         {
             mainWindow.ShowActivated = false;
@@ -59,6 +62,47 @@ public partial class App : Application
         {
             ScheduleStartupVerification(mainWindow);
         }
+        else if (!options.PreviewOnly)
+        {
+            mainWindow.ExplorerIntegrationToggleRequested += (_, _) =>
+                SetExplorerIntegration(mainWindow, mainWindow.IsExplorerIntegrationRequested);
+            SetExplorerIntegration(mainWindow, enabled: true);
+        }
+    }
+
+    private void SetExplorerIntegration(MainWindow window, bool enabled)
+    {
+        _explorerIntegration?.Dispose();
+        _explorerIntegration = null;
+        if (!enabled)
+        {
+            window.SetExplorerIntegrationState(false, "탐색기 Space 미리보기가 꺼져 있습니다. 클릭하면 다시 켭니다.");
+            return;
+        }
+
+        try
+        {
+            _explorerIntegration = new ExplorerPreviewIntegration(Dispatcher);
+            _explorerIntegration.Failed += (_, message) =>
+            {
+                _explorerIntegration?.Dispose();
+                _explorerIntegration = null;
+                window.SetExplorerIntegrationState(false, message);
+            };
+            window.SetExplorerIntegrationState(true,
+                "모아뷰 실행 중 탐색기 파일 목록에서 파일 하나를 선택한 뒤 Space로 열고 닫습니다. 선택을 바꾸면 미리보기도 바뀝니다. 기본 창을 닫으면 연동도 종료됩니다.");
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or UnauthorizedAccessException)
+        {
+            window.SetExplorerIntegrationState(false, $"탐색기 연동을 시작하지 못했습니다. {ex.Message}");
+        }
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _explorerIntegration?.Dispose();
+        _explorerIntegration = null;
+        base.OnExit(e);
     }
 
     public static StartupOptions ParseStartupOptions(
@@ -66,12 +110,13 @@ public partial class App : Application
         IReadOnlyList<string>? eventArgs)
     {
         var verifyStartup = false;
+        var previewOnly = false;
         string? initialFilePath = null;
 
-        InspectArgs(constructorArgs, ref verifyStartup, ref initialFilePath);
-        InspectArgs(eventArgs, ref verifyStartup, ref initialFilePath);
+        InspectArgs(constructorArgs, ref verifyStartup, ref previewOnly, ref initialFilePath);
+        InspectArgs(eventArgs, ref verifyStartup, ref previewOnly, ref initialFilePath);
 
-        return new StartupOptions(initialFilePath, verifyStartup);
+        return new StartupOptions(initialFilePath, verifyStartup, previewOnly);
     }
 
     public static string? ResolveInitialFilePath(
@@ -82,6 +127,7 @@ public partial class App : Application
     private static void InspectArgs(
         IReadOnlyList<string>? args,
         ref bool verifyStartup,
+        ref bool previewOnly,
         ref string? initialFilePath)
     {
         if (args is null)
@@ -102,6 +148,12 @@ public partial class App : Application
                 continue;
             }
 
+            if (string.Equals(arg.Trim(), PreviewSwitch, StringComparison.OrdinalIgnoreCase))
+            {
+                previewOnly = true;
+                continue;
+            }
+
             initialFilePath ??= arg;
         }
     }
@@ -110,10 +162,12 @@ public partial class App : Application
     {
         mainWindow.Dispatcher.BeginInvoke(
             DispatcherPriority.ApplicationIdle,
-            new Action(() =>
+            new Action(async () =>
             {
                 try
                 {
+                    if (mainWindow.ViewModel.IsRiveVisible)
+                        await mainWindow.WaitForRivePreviewAsync().WaitAsync(TimeSpan.FromSeconds(12));
                     var verified = mainWindow.VerifyRenderedState();
                     WriteVerificationReport(mainWindow, verified);
 
@@ -144,6 +198,7 @@ public partial class App : Application
             $"|VISIBLE={window.IsVisible}" +
             $"|TITLE={window.Title}" +
             $"|BADGE={vm.NoticeBadgeText}" +
+            $"|RIVE={window.RivePlaybackStatus}" +
             $"|PIXELS={result.PixelWidth}x{result.PixelHeight}";
 
         using var stdout = Console.OpenStandardOutput();

@@ -98,57 +98,7 @@ public sealed class ImagePreviewService : IPreviewService
             fileStream.CopyTo(memoryStream);
             memoryStream.Position = 0;
 
-            var decoder = BitmapDecoder.Create(
-                memoryStream,
-                BitmapCreateOptions.PreservePixelFormat | BitmapCreateOptions.IgnoreColorProfile,
-                BitmapCacheOption.OnLoad);
-
-            if (!TryGetSupportedDecoderFormat(decoder, out var actualFormat))
-            {
-                return PreviewResult.Unsupported(
-                    fullPath,
-                    fileName,
-                    extension,
-                    title: "지원하지 않는 이미지 형식입니다.",
-                    message: $"파일 확장자는 '{extension}'이지만 실제 데이터 형식이 지원 범위 밖입니다. {SupportedFileFormats.SupportedFormatsDetailText}.");
-            }
-
-            if (decoder.Frames.Count == 0)
-            {
-                return PreviewResult.Failure(
-                    fullPath,
-                    fileName,
-                    extension,
-                    title: "이미지를 표시할 수 없습니다.",
-                    message: "이미지 프레임을 찾을 수 없습니다.");
-            }
-
-            var firstFrame = decoder.Frames[0];
-            if (firstFrame.PixelWidth <= 0 || firstFrame.PixelHeight <= 0)
-            {
-                return PreviewResult.Failure(
-                    fullPath,
-                    fileName,
-                    extension,
-                    title: "이미지를 표시할 수 없습니다.",
-                    message: "유효하지 않은 이미지 크기입니다.");
-            }
-
-            // 렌더링 시점 크래시를 막기 위해 픽셀 버퍼를 즉시 디코딩·복사하고 Freeze합니다.
-            BitmapSource decodedSource = firstFrame.Format == PixelFormats.Bgra32
-                ? firstFrame
-                : new FormatConvertedBitmap(firstFrame, PixelFormats.Bgra32, null, 0);
-
-            var detachedBitmap = new WriteableBitmap(decodedSource);
-            detachedBitmap.Freeze();
-
-            return PreviewResult.Image(
-                fullPath,
-                fileName,
-                extension,
-                actualFormat,
-                detachedBitmap,
-                fileLength);
+            return Decode(memoryStream, fullPath, fileName, extension, fileLength);
         }
         catch (UnauthorizedAccessException)
         {
@@ -174,7 +124,8 @@ public sealed class ImagePreviewService : IPreviewService
             or InvalidOperationException
             or ArgumentException
             or OverflowException
-            or COMException)
+            or COMException
+            or PreviewLimitException)
         {
             return PreviewResult.Failure(
                 fullPath,
@@ -183,6 +134,80 @@ public sealed class ImagePreviewService : IPreviewService
                 title: "이미지를 표시할 수 없습니다.",
                 message: "파일이 손상되었거나 올바른 이미지 데이터가 아니어서 열 수 없습니다.");
         }
+    }
+
+    public PreviewResult LoadBytes(byte[] bytes, string displayName)
+    {
+        var extension = Path.GetExtension(displayName);
+        try
+        {
+            using var stream = new MemoryStream(bytes, writable: false);
+            return Decode(stream, displayName, displayName, extension, bytes.LongLength);
+        }
+        catch (Exception ex) when (ex is IOException or FileFormatException or NotSupportedException or InvalidOperationException
+            or ArgumentException or OverflowException or COMException or PreviewLimitException)
+        {
+            return PreviewResult.Failure(displayName, displayName, extension,
+                "이미지를 표시할 수 없습니다.", ex is PreviewLimitException ? ex.Message : "파일이 손상되었거나 올바른 이미지 데이터가 아닙니다.");
+        }
+    }
+
+    private static PreviewResult Decode(Stream stream, string fullPath, string fileName, string extension, long fileLength)
+    {
+        var decoder = BitmapDecoder.Create(
+            stream,
+            BitmapCreateOptions.PreservePixelFormat | BitmapCreateOptions.IgnoreColorProfile,
+            BitmapCacheOption.OnDemand);
+
+        if (!TryGetSupportedDecoderFormat(decoder, out var actualFormat))
+        {
+            return PreviewResult.Unsupported(
+                fullPath,
+                fileName,
+                extension,
+                title: "지원하지 않는 이미지 형식입니다.",
+                message: $"파일 확장자는 '{extension}'이지만 실제 데이터 형식이 지원 범위 밖입니다. {SupportedFileFormats.SupportedFormatsDetailText}.");
+        }
+
+        if (decoder.Frames.Count == 0)
+        {
+            return PreviewResult.Failure(
+                fullPath,
+                fileName,
+                extension,
+                title: "이미지를 표시할 수 없습니다.",
+                message: "이미지 프레임을 찾을 수 없습니다.");
+        }
+
+        var firstFrame = decoder.Frames[0];
+        if (firstFrame.PixelWidth <= 0 || firstFrame.PixelHeight <= 0)
+        {
+            return PreviewResult.Failure(
+                fullPath,
+                fileName,
+                extension,
+                title: "이미지를 표시할 수 없습니다.",
+                message: "유효하지 않은 이미지 크기입니다.");
+        }
+
+        if ((long)firstFrame.PixelWidth * firstFrame.PixelHeight > 64_000_000)
+            throw new PreviewLimitException("이미지 크기가 6,400만 픽셀 제한을 넘습니다.");
+
+        // 렌더링 시점 크래시를 막기 위해 픽셀 버퍼를 즉시 디코딩·복사하고 Freeze합니다.
+        BitmapSource decodedSource = firstFrame.Format == PixelFormats.Bgra32
+            ? firstFrame
+            : new FormatConvertedBitmap(firstFrame, PixelFormats.Bgra32, null, 0);
+
+        var detachedBitmap = new WriteableBitmap(decodedSource);
+        detachedBitmap.Freeze();
+
+        return PreviewResult.Image(
+            fullPath,
+            fileName,
+            extension,
+            actualFormat,
+            detachedBitmap,
+            fileLength);
     }
 
     private static bool TryGetSupportedDecoderFormat(BitmapDecoder decoder, out ImageFormatKind format)

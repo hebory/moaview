@@ -156,7 +156,7 @@ public sealed class MainWindowUiTests
     public void MainWindow_ShownWindowPreloadedStateAndFileDrop_RenderExpectedControls()
     {
         using var temp = new TempTestDirectory();
-        var unsupportedPath = temp.GetPath("notes.txt");
+        var unsupportedPath = temp.GetPath("notes.pdf");
         File.WriteAllText(unsupportedPath, "plain text");
         var droppedGifPath = SampleImageFactory.WriteValidImage(
             temp.GetPath("dropped.gif"),
@@ -217,6 +217,13 @@ public sealed class MainWindowUiTests
         var verifyWithoutFile = App.ParseStartupOptions([], ["  --VERIFY-STARTUP  "]);
         Assert.True(verifyWithoutFile.VerifyStartupAndClose);
         Assert.Null(verifyWithoutFile.InitialFilePath);
+
+        const string shellFile = @"C:\Preview Samples\file & notes.md";
+        var shellPreview = App.ParseStartupOptions([App.PreviewSwitch, shellFile], [App.VerifyStartupSwitch]);
+        Assert.True(shellPreview.PreviewOnly);
+        Assert.True(shellPreview.VerifyStartupAndClose);
+        Assert.Equal(shellFile, shellPreview.InitialFilePath);
+        Assert.False(verifyWithFile.PreviewOnly);
     }
 
     [Fact]
@@ -260,6 +267,26 @@ public sealed class MainWindowUiTests
         Assert.Contains("|STATE=Error|", errorRun, StringComparison.Ordinal);
         Assert.Contains("|VISIBLE=True|", errorRun, StringComparison.Ordinal);
         Assert.Contains("|BADGE=열기 실패|", errorRun, StringComparison.Ordinal);
+
+        var zipPath = ContentPreviewTests.WriteZip(temp.GetPath("launch.zip"), new Dictionary<string, byte[]>
+        { ["text.txt"] = Encoding.UTF8.GetBytes("압축파일 테스트") });
+        var zipRun = RunStartupVerification(exePath, zipPath);
+        Assert.Contains("MOAVIEW_STARTUP_VERIFIED=True|STATE=ArchiveLoaded|", zipRun, StringComparison.Ordinal);
+        var textPath = temp.GetPath("launch.txt");
+        File.WriteAllText(textPath, "내용 미리보기");
+        Assert.Contains("MOAVIEW_STARTUP_VERIFIED=True|STATE=TextLoaded|", RunStartupVerification(exePath, textPath), StringComparison.Ordinal);
+        var rivePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "data_bind_runtime_test.riv");
+        var riveRun = RunStartupVerification(exePath, rivePath);
+        Assert.Contains("MOAVIEW_STARTUP_VERIFIED=True|STATE=RiveLoaded|", riveRun, StringComparison.Ordinal);
+        Assert.Contains("|RIVE=ready|", riveRun, StringComparison.Ordinal);
+        var purPath = PurPreviewTests.WriteContainer(temp.GetPath("launch.pur"), File.ReadAllBytes(pngPath));
+        var purRun = RunStartupVerification(exePath, purPath);
+        Assert.Contains("MOAVIEW_STARTUP_VERIFIED=True|STATE=ImageLoaded|", purRun, StringComparison.Ordinal);
+        Assert.Contains("|TITLE=launch.pur - 모아뷰 (MoaView)|", purRun, StringComparison.Ordinal);
+        Assert.Contains("|PIXELS=64x48", purRun, StringComparison.Ordinal);
+        var markdownPath = temp.GetPath("launch.md");
+        File.WriteAllText(markdownPath, "# Markdown 시작\n\n**서식** 미리보기");
+        Assert.Contains("MOAVIEW_STARTUP_VERIFIED=True|STATE=TextLoaded|", RunStartupVerification(exePath, markdownPath), StringComparison.Ordinal);
     }
 
     [Fact]

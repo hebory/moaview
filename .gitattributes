@@ -1,0 +1,2 @@
+src/MoaView/Assets/Rive/vendor/* -text
+tests/MoaView.Tests/Fixtures/*.riv -text

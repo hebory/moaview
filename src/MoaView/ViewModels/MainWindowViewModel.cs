@@ -47,6 +47,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private readonly ISaveFileDialogService _saveFileDialogService;
     private readonly IFolderNavigationService _folderNavigationService;
     private readonly IImageConversionService _imageConversionService;
+    private readonly FilePreviewService _contentService = new();
+    private ArchiveEntryInfo? _selectedArchiveEntry;
+    private DocumentSection? _selectedDocumentSection;
+    private readonly IMarkdownThemeSettings _markdownThemeSettings;
+    private MarkdownThemeOption _selectedMarkdownTheme;
+    private bool _showMarkdownSource;
+    private string _markdownSettingsMessage = string.Empty;
 
     private readonly RelayCommand _openFileCommand;
     private readonly RelayCommand _previousImageCommand;
@@ -79,7 +86,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     private MainWindowViewModel(Win32FileDialogService defaultDialogService)
         : this(
-            new ImagePreviewService(),
+            new FilePreviewService(),
             defaultDialogService,
             defaultDialogService,
             new FolderImageNavigationService(),
@@ -110,7 +117,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         IFileDialogService fileDialogService,
         ISaveFileDialogService saveFileDialogService,
         IFolderNavigationService? folderNavigationService = null,
-        IImageConversionService? imageConversionService = null)
+        IImageConversionService? imageConversionService = null,
+        IMarkdownThemeSettings? markdownThemeSettings = null)
     {
         ArgumentNullException.ThrowIfNull(previewService);
         ArgumentNullException.ThrowIfNull(fileDialogService);
@@ -121,6 +129,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         _saveFileDialogService = saveFileDialogService;
         _folderNavigationService = folderNavigationService ?? new FolderImageNavigationService();
         _imageConversionService = imageConversionService ?? new ImageConversionService();
+        _markdownThemeSettings = markdownThemeSettings ?? new MarkdownThemeSettings();
+        _selectedMarkdownTheme = MarkdownThemeOption.For(_markdownThemeSettings.Load());
 
         _openFileCommand = new RelayCommand(param => SelectAndOpenFile(param as Window));
         _previousImageCommand = new RelayCommand(_ => MovePreviousImage(), _ => CanNavigatePrevious);
@@ -205,9 +215,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool CanExecuteConversion => !IsEmptyState;
+    public bool CanExecuteConversion => !IsEmptyState && !IsArchiveVisible && !IsPurVisible && State is not (PreviewStateKind.TextLoaded or PreviewStateKind.RiveLoaded);
 
     public bool CanConvertLoadedFormat =>
+        !IsArchiveVisible && !IsPurVisible &&
         State == PreviewStateKind.ImageLoaded &&
         _currentResult.ImageFormat is { } format &&
         SupportedFileFormats.IsConvertibleFormat(format);
@@ -245,6 +256,95 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public string SupportedConversionSummary => SupportedFileFormats.SupportedConversionShortText;
 
     public PreviewResult CurrentResult => _currentResult;
+
+    public bool IsArchiveVisible => _currentResult.Archive is not null;
+    public Visibility ArchiveVisibility => IsArchiveVisible ? Visibility.Visible : Visibility.Collapsed;
+    public GridLength ArchiveColumnWidth => IsArchiveVisible || IsPurVisible ? new GridLength(240) : new GridLength(0);
+    public IReadOnlyList<ArchiveEntryInfo> ArchiveEntries => _currentResult.Archive?.Entries ?? Array.Empty<ArchiveEntryInfo>();
+    public string ArchiveSummary => $"ZIP · {ArchiveEntries.Count:N0}개 항목";
+    public Visibility ArchivePlaceholderVisibility => State == PreviewStateKind.ArchiveLoaded ? Visibility.Visible : Visibility.Collapsed;
+    public bool IsTextVisible => State == PreviewStateKind.TextLoaded;
+    public Visibility TextVisibility => IsTextVisible ? Visibility.Visible : Visibility.Collapsed;
+    public bool IsRiveVisible => State == PreviewStateKind.RiveLoaded;
+    public Visibility RiveVisibility => IsRiveVisible ? Visibility.Visible : Visibility.Collapsed;
+    public IReadOnlyList<DocumentSection> DocumentSections => _currentResult.Sections;
+    public string TextContent => _selectedDocumentSection?.Text ?? string.Empty;
+    public string ContentDescription => IsMarkdown ? "Markdown · 서식 미리보기 / 원문 보기" : _currentResult.ContentDescription;
+
+    public bool IsMarkdown => IsTextVisible && string.Equals(_currentResult.Extension, ".md", StringComparison.OrdinalIgnoreCase);
+    public Visibility MarkdownToolbarVisibility => IsMarkdown ? Visibility.Visible : Visibility.Collapsed;
+    public bool IsMarkdownRendered => IsMarkdown && !ShowMarkdownSource;
+    public Visibility MarkdownRenderedVisibility => IsMarkdownRendered ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility TextSourceVisibility => IsTextVisible && !IsMarkdownRendered ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility DocumentSectionVisibility => IsTextVisible && !IsMarkdown ? Visibility.Visible : Visibility.Collapsed;
+    public string MarkdownContent => IsMarkdown ? TextContent : string.Empty;
+    public IReadOnlyList<MarkdownThemeOption> MarkdownThemes => MarkdownThemeOption.All;
+    public Brush TextBackground => (IsMarkdown ? SelectedMarkdownTheme : MarkdownThemeOption.All[0]).Background;
+    public Brush TextForeground => (IsMarkdown ? SelectedMarkdownTheme : MarkdownThemeOption.All[0]).Foreground;
+    public Brush TextBorderBrush => (IsMarkdown ? SelectedMarkdownTheme : MarkdownThemeOption.All[0]).Border;
+    public string MarkdownSettingsMessage => _markdownSettingsMessage;
+    public Visibility MarkdownSettingsMessageVisibility => IsMarkdown && _markdownSettingsMessage.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    public MarkdownThemeOption SelectedMarkdownTheme
+    {
+        get => _selectedMarkdownTheme;
+        set
+        {
+            if (value is null || value == _selectedMarkdownTheme || !MarkdownThemes.Contains(value)) return;
+            _selectedMarkdownTheme = value;
+            _markdownSettingsMessage = _markdownThemeSettings.TrySave(value.Theme) ? string.Empty :
+                "테마를 저장하지 못했습니다. 현재 창에는 적용되지만 다음 실행에는 유지되지 않을 수 있습니다.";
+            NotifyAllStatePropertiesChanged();
+        }
+    }
+
+    public bool ShowMarkdownSource
+    {
+        get => _showMarkdownSource;
+        set
+        {
+            if (value == _showMarkdownSource) return;
+            _showMarkdownSource = value;
+            NotifyAllStatePropertiesChanged();
+        }
+    }
+
+    public bool IsPurVisible => _currentResult.Pur is not null;
+    public Visibility PurVisibility => IsPurVisible ? Visibility.Visible : Visibility.Collapsed;
+    public IReadOnlyList<PurImageEntry> PurImages => _currentResult.Pur?.Images ?? Array.Empty<PurImageEntry>();
+    public string PurSummary => $"PureRef · 포함 이미지 {PurImages.Count:N0}개";
+    public PurImageEntry? SelectedPurImage
+    {
+        get => _currentResult.PurImage;
+        set
+        {
+            if (value is null || value == SelectedPurImage || _currentResult.Pur is not { } pur || !pur.Images.Contains(value)) return;
+            ApplyResult(_contentService.LoadPurImage(pur, value));
+        }
+    }
+
+    public DocumentSection? SelectedDocumentSection
+    {
+        get => _selectedDocumentSection;
+        set
+        {
+            if (value == _selectedDocumentSection || value is null || !DocumentSections.Contains(value)) return;
+            _selectedDocumentSection = value;
+            NotifyAllStatePropertiesChanged();
+            ViewResetRequested?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public ArchiveEntryInfo? SelectedArchiveEntry
+    {
+        get => _selectedArchiveEntry;
+        set
+        {
+            if (value == _selectedArchiveEntry || value is null || _currentResult.Archive is not { } archive || !archive.Entries.Contains(value)) return;
+            _selectedArchiveEntry = value;
+            ApplyResult(_contentService.LoadArchiveEntry(archive, value));
+        }
+    }
 
     public PreviewStateKind State => _currentResult.State;
 
@@ -299,9 +399,9 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             ? ScrollBarVisibility.Disabled
             : ScrollBarVisibility.Auto;
 
-    public bool CanNavigatePrevious => _navigationContext.CanMovePrevious;
+    public bool CanNavigatePrevious => !IsArchiveVisible && !IsPurVisible && _navigationContext.CanMovePrevious;
 
-    public bool CanNavigateNext => _navigationContext.CanMoveNext;
+    public bool CanNavigateNext => !IsArchiveVisible && !IsPurVisible && _navigationContext.CanMoveNext;
 
     public bool CanZoomIn => IsImageVisible && GetEffectiveScale() < MaxZoomFactor - 0.005;
 
@@ -364,7 +464,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public string CurrentFilePathDisplay => string.IsNullOrWhiteSpace(_currentResult.FilePath)
         ? "선택된 파일 없음"
-        : _currentResult.FilePath!;
+        : _currentResult.FilePath! + (_currentResult.ArchiveEntryName is { } entry ? $" › {entry}" : "");
 
     public string MetadataSummary
     {
@@ -387,11 +487,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
                     ? string.Create(CultureInfo.InvariantCulture, $" · {_navigationContext.CurrentIndex + 1}/{_navigationContext.TotalCount}")
                     : string.Empty;
 
-                return $"{baseSummary}{rotationPart}{viewPart}{folderPart}";
+                var purPart = IsPurVisible ? $"PUR · {(SelectedPurImage?.Index ?? 0) + 1}/{PurImages.Count} · " : string.Empty;
+                return $"{purPart}{baseSummary}{rotationPart}{viewPart}{folderPart}";
             }
 
             return State switch
             {
+                PreviewStateKind.TextLoaded => $"{DocumentSections.Count}개 구역 · {FormatFileSize(_currentResult.FileSizeBytes)}",
+                PreviewStateKind.RiveLoaded => $"Rive · {FormatFileSize(_currentResult.FileSizeBytes)}",
+                PreviewStateKind.ArchiveLoaded => ArchiveSummary,
                 PreviewStateKind.UnsupportedFormat => "미지원 형식",
                 PreviewStateKind.Error => "미리보기 불가",
                 _ => "대기 중",
@@ -422,7 +526,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public PreviewResult OpenFile(string? filePath)
     {
         var result = _previewService.Load(filePath);
+        _selectedArchiveEntry = null;
+        return ApplyResult(result);
+    }
+
+    private PreviewResult ApplyResult(PreviewResult result)
+    {
         _currentResult = result;
+        _selectedDocumentSection = result.Sections.FirstOrDefault();
         _lastConversionResult = ImageConversionResult.None();
         _isFitToWindow = true;
         _zoomFactor = DefaultZoomFactor;
@@ -434,7 +545,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
 
         RebuildPreviewBitmap();
-        _navigationContext = _folderNavigationService.ResolveContext(result.FilePath ?? filePath);
+        _navigationContext = IsArchiveVisible || IsPurVisible || State is PreviewStateKind.TextLoaded or PreviewStateKind.RiveLoaded
+            ? FolderNavigationContext.Empty : _folderNavigationService.ResolveContext(result.FilePath);
 
         NotifyAllStatePropertiesChanged();
         ViewResetRequested?.Invoke(this, EventArgs.Empty);
@@ -443,6 +555,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public ImageConversionResult ConvertCurrentImage(Window? owner = null)
     {
+        if (IsArchiveVisible || IsPurVisible || State is PreviewStateKind.TextLoaded or PreviewStateKind.RiveLoaded)
+            return BlockContentConversion(null, _selectedConversionFormat);
         if (IsEmptyState)
         {
             return ImageConversionResult.None();
@@ -501,6 +615,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ImageFormatKind? targetFormat = null)
     {
         var effectiveTarget = targetFormat ?? _selectedConversionFormat;
+        if (IsArchiveVisible || IsPurVisible || State is PreviewStateKind.TextLoaded or PreviewStateKind.RiveLoaded)
+            return BlockContentConversion(destinationFilePath, effectiveTarget);
         if (SupportedFileFormats.IsConvertibleFormat(effectiveTarget))
         {
             _selectedConversionFormat = effectiveTarget;
@@ -574,6 +690,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public bool MoveNextImage()
     {
+        if (IsArchiveVisible || IsPurVisible || IsTextVisible || IsRiveVisible) return false;
         var nextPath = _folderNavigationService.GetNextImagePath(_currentResult.FilePath);
         if (string.IsNullOrWhiteSpace(nextPath))
         {
@@ -587,6 +704,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public bool MovePreviousImage()
     {
+        if (IsArchiveVisible || IsPurVisible || IsTextVisible || IsRiveVisible) return false;
         var previousPath = _folderNavigationService.GetPreviousImagePath(_currentResult.FilePath);
         if (string.IsNullOrWhiteSpace(previousPath))
         {
@@ -792,6 +910,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     }
 
     private static Win32FileDialogService CreateDefaultDialogService() => new();
+
+    private ImageConversionResult BlockContentConversion(string? destination, ImageFormatKind format)
+    {
+        _lastConversionResult = ImageConversionResult.Unsupported(_currentResult.FilePath, destination, null, format,
+            "이 미리보기는 이미지 변환을 지원하지 않습니다.", "ZIP 내부 항목·문서·텍스트·Rive·PureRef 파일은 내용 확인만 지원합니다. 변환하려면 별도의 원본 이미지 파일을 열어 주세요.");
+        NotifyAllStatePropertiesChanged();
+        return _lastConversionResult;
+    }
 
     private static ImageFormatKind GetSuggestedTargetFormat(
         ImageFormatKind loadedFormat,
