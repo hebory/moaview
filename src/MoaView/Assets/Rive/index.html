@@ -12,8 +12,8 @@
   <header>
     <label>아트보드 <select id="artboard" aria-label="아트보드"></select></label>
     <label>재생 <select id="animation" aria-label="애니메이션 또는 상태 머신"></select></label>
-    <button id="pause" disabled>일시정지</button>
-    <button id="restart" disabled>처음부터</button>
+    <button id="pause" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path class="pause-mark" d="M8 5v14m8-14v14"/><path class="play-mark" d="m8 5 11 7-11 7Z"/></svg><span id="pause-label">일시정지</span></button>
+    <button id="restart" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 10a8 8 0 1 1-.2 4M4 4v6h6"/></svg><span>처음부터</span></button>
   </header>
   <main><canvas id="canvas" aria-label="Rive 애니메이션"></canvas></main>
   <footer id="status" role="status">Rive 파일을 준비하고 있습니다.</footer>

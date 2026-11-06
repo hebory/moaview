@@ -17,7 +17,9 @@ internal abstract class SpecializedPreviewControl : Grid, IDisposable
 
     protected SpecializedPreviewControl()
     {
+        SetResourceReference(BackgroundProperty, "AppPreviewBrush");
         Children.Add(_status);
+        _status.SetResourceReference(TextBlock.ForegroundProperty, "AppMutedBrush");
         SetZIndex(_status, 1);
     }
 

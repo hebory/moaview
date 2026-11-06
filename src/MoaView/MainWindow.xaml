@@ -11,19 +11,20 @@
         MinWidth="560"
         MinHeight="400"
         WindowStartupLocation="CenterScreen"
-        Background="#181A1F"
-        Foreground="#F3F4F6"
+        Background="{DynamicResource AppWindowBrush}"
+        Foreground="{DynamicResource AppTextBrush}"
         AllowDrop="True"
         PreviewKeyDown="OnWindowPreviewKeyDown"
         DragOver="OnWindowDragOver"
         Drop="OnWindowDrop">
     <Window.Resources>
         <Style x:Key="ViewerToolbarButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="#2C313C" />
-            <Setter Property="Foreground" Value="#F3F4F6" />
-            <Setter Property="BorderBrush" Value="#3E4656" />
+            <Setter Property="Background" Value="{DynamicResource AppControlBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="MinHeight" Value="32" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="Medium" />
             <Setter Property="Cursor" Value="Hand" />
@@ -35,26 +36,28 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4"
+                                CornerRadius="8"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="Background" Value="#3A4252" />
-                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#525D73" />
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource AppHoverBrush}" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="Background" Value="#4B5568" />
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource AppPressedBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#A5B4FC" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AppAccentTextBrush}" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="ButtonBorder" Property="Background" Value="#1E222A" />
-                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#2A2F3A" />
-                                <Setter Property="Foreground" Value="#6B7280" />
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AppDisabledBrush}" />
                                 <Setter Property="Cursor" Value="Arrow" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -63,13 +66,98 @@
             </Setter>
         </Style>
 
+        <Style x:Key="IconToolbarButtonStyle" TargetType="Button" BasedOn="{StaticResource ViewerToolbarButtonStyle}">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+
+        <Style x:Key="PrimaryToolbarButtonStyle" TargetType="Button" BasedOn="{StaticResource ViewerToolbarButtonStyle}">
+            <Setter Property="Background" Value="{DynamicResource AppAccentBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AppOnAccentBrush}" />
+        </Style>
+
+        <Style x:Key="ThemeTileStyle" TargetType="ListBoxItem">
+            <Setter Property="Margin" Value="0,0,5,0" />
+            <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+            <Setter Property="Background" Value="{DynamicResource AppControlBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Tile" Background="{TemplateBinding Background}"
+                                BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="3,6">
+                            <ContentPresenter HorizontalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Tile" Property="Background" Value="{DynamicResource AppHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Tile" Property="BorderBrush" Value="{DynamicResource AppAccentTextBrush}" />
+                                <Setter TargetName="Tile" Property="BorderThickness" Value="2" />
+                                <Setter TargetName="Tile" Property="Padding" Value="2,5" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Tile" Property="Background" Value="{DynamicResource AppPressedBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PreviewSourceStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsMarkdown}" Value="True">
+                    <Setter Property="Background" Value="{Binding TextBackground}" />
+                    <Setter Property="Foreground" Value="{Binding TextForeground}" />
+                    <Setter Property="BorderBrush" Value="{Binding TextBorderBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PreviewEntryStyle" TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Entry" Margin="4,1" Padding="{TemplateBinding Padding}" CornerRadius="6"
+                                BorderThickness="1" BorderBrush="Transparent" Background="Transparent">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Entry" Property="Background" Value="{DynamicResource AppHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Entry" Property="Background" Value="{DynamicResource AppControlBrush}" />
+                                <Setter TargetName="Entry" Property="BorderBrush" Value="{DynamicResource AppAccentTextBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Entry" Property="BorderBrush" Value="{DynamicResource AppAccentTextBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="FlyoutCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="#242B37" />
-            <Setter Property="BorderBrush" Value="#495669" />
+            <Setter Property="Background" Value="{DynamicResource AppPanelBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="16" />
-            <Setter Property="TextElement.Foreground" Value="#F3F4F6" />
+            <Setter Property="TextElement.Foreground" Value="{DynamicResource AppTextBrush}" />
         </Style>
         <Style x:Key="FlyoutHeadingStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="13" />
@@ -77,7 +165,7 @@
             <Setter Property="Margin" Value="0,0,0,8" />
         </Style>
         <Style x:Key="FlyoutHelpStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#B3BECD" />
+            <Setter Property="Foreground" Value="{DynamicResource AppMutedBrush}" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="Margin" Value="0,6,0,0" />
@@ -85,23 +173,23 @@
 
         <Style x:Key="FitModeButtonStyle"
                TargetType="Button"
-               BasedOn="{StaticResource ViewerToolbarButtonStyle}">
+               BasedOn="{StaticResource IconToolbarButtonStyle}">
             <Style.Triggers>
                 <MultiDataTrigger>
                     <MultiDataTrigger.Conditions>
                         <Condition Binding="{Binding IsImageVisible}" Value="True" />
                         <Condition Binding="{Binding IsFitToWindow}" Value="True" />
                     </MultiDataTrigger.Conditions>
-                    <Setter Property="Background" Value="#2563EB" />
-                    <Setter Property="BorderBrush" Value="#60A5FA" />
-                    <Setter Property="Foreground" Value="#FFFFFF" />
+                    <Setter Property="Background" Value="{DynamicResource AppAccentBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AppAccentTextBrush}" />
+                    <Setter Property="Foreground" Value="{DynamicResource AppOnAccentBrush}" />
                 </MultiDataTrigger>
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="DarkComboBoxItemStyle" TargetType="ComboBoxItem">
-            <Setter Property="Background" Value="#232832" />
-            <Setter Property="Foreground" Value="#F3F4F6" />
+        <Style x:Key="ToolbarComboBoxItemStyle" TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="{DynamicResource AppPanelBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
             <Setter Property="Padding" Value="10,5" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="Template">
@@ -114,11 +202,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="#374151" />
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource AppHoverBrush}" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="#1D4ED8" />
-                                <Setter Property="Foreground" Value="#FFFFFF" />
+                                <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource AppAccentBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AppOnAccentBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -126,15 +214,15 @@
             </Setter>
         </Style>
 
-        <Style x:Key="DarkToolbarComboBoxStyle" TargetType="ComboBox">
-            <Setter Property="Background" Value="#2C313C" />
-            <Setter Property="Foreground" Value="#F3F4F6" />
-            <Setter Property="BorderBrush" Value="#3E4656" />
+        <Style x:Key="ToolbarComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Background" Value="{DynamicResource AppControlBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="Medium" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="ItemContainerStyle" Value="{StaticResource DarkComboBoxItemStyle}" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource ToolbarComboBoxItemStyle}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBox">
@@ -170,14 +258,14 @@
                                                                   ContentStringFormat="{Binding SelectionBoxItemStringFormat, RelativeSource={RelativeSource AncestorType=ComboBox}}" />
                                                 <Path Grid.Column="1"
                                                       Data="M 0 0 L 4 4 L 8 0 Z"
-                                                      Fill="#9CA3AF"
+                                                      Fill="{DynamicResource AppMutedBrush}"
                                                       VerticalAlignment="Center" />
                                             </Grid>
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="ComboBorder" Property="Background" Value="#3A4252" />
-                                                <Setter TargetName="ComboBorder" Property="BorderBrush" Value="#525D73" />
+                                                <Setter TargetName="ComboBorder" Property="Background" Value="{DynamicResource AppHoverBrush}" />
+                                                <Setter TargetName="ComboBorder" Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -191,8 +279,8 @@
                                    Focusable="False"
                                    PopupAnimation="Slide">
                                 <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
-                                        Background="#232832"
-                                        BorderBrush="#4B5563"
+                                        Background="{DynamicResource AppPanelBrush}"
+                                        BorderBrush="{DynamicResource AppBorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="4"
                                         Margin="0,2,0,0">
@@ -205,9 +293,9 @@
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Background" Value="#1E222A" />
-                                <Setter Property="BorderBrush" Value="#2A2F3A" />
-                                <Setter Property="Foreground" Value="#6B7280" />
+                                <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AppDisabledBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -216,30 +304,30 @@
         </Style>
 
         <Style x:Key="ConversionNoticeBannerStyle" TargetType="Border">
-            <Setter Property="Background" Value="#251F24" />
-            <Setter Property="BorderBrush" Value="#6B3A45" />
+            <Setter Property="Background" Value="{DynamicResource AppErrorSurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AppErrorBorderBrush}" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding ConversionStatus}" Value="{x:Static models:ConversionStatusKind.Succeeded}">
-                    <Setter Property="Background" Value="#172924" />
-                    <Setter Property="BorderBrush" Value="#235347" />
+                    <Setter Property="Background" Value="{DynamicResource AppSuccessSurfaceBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AppSuccessBorderBrush}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="ConversionNoticeBadgeBorderStyle" TargetType="Border">
-            <Setter Property="Background" Value="#4C2630" />
+            <Setter Property="Background" Value="{DynamicResource AppErrorBadgeBrush}" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding ConversionStatus}" Value="{x:Static models:ConversionStatusKind.Succeeded}">
-                    <Setter Property="Background" Value="#1E4D3B" />
+                    <Setter Property="Background" Value="{DynamicResource AppSuccessBadgeBrush}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
 
         <Style x:Key="ConversionNoticeBadgeTextStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#FCA5A5" />
+            <Setter Property="Foreground" Value="{DynamicResource AppErrorTextBrush}" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding ConversionStatus}" Value="{x:Static models:ConversionStatusKind.Succeeded}">
-                    <Setter Property="Foreground" Value="#86EFAC" />
+                    <Setter Property="Foreground" Value="{DynamicResource AppSuccessTextBrush}" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -265,55 +353,101 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Background="#20252F" BorderBrush="#343D4C" BorderThickness="0,0,0,1" Padding="16,10">
+        <Border Grid.Row="0" Background="{DynamicResource AppSurfaceBrush}" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0,0,0,1" Padding="16,10">
             <DockPanel LastChildFill="False">
-                <Button x:Name="SettingsButton" DockPanel.Dock="Right" Content="⚙  설정"
-                        Style="{StaticResource ViewerToolbarButtonStyle}" Padding="12,6"
+                <Button x:Name="SettingsButton" DockPanel.Dock="Right"
+                        Style="{StaticResource IconToolbarButtonStyle}"
                         AutomationProperties.Name="설정" Click="OnSettingsClick"
-                        ToolTip="탐색기 연동, 마크다운 테마, 사용 안내" />
+                        ToolTip="설정 · 앱 테마, 탐색기 연동, 사용 안내">
+                    <controls:AppIcon Kind="Settings" />
+                </Button>
                 <TextBlock x:Name="ExplorerPreviewHint" DockPanel.Dock="Right" Text="Esc 또는 Space로 닫기"
-                           Foreground="#AAB4C3" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" Visibility="Collapsed" />
+                           Foreground="{DynamicResource AppMutedBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" Visibility="Collapsed" />
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
                     <Image Source="Assets/Brand/MoaView.png" Width="28" Height="28" Margin="0,0,7,0" RenderOptions.BitmapScalingMode="HighQuality" />
                     <TextBlock Text="모아뷰" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,16,0" />
-                    <Button x:Name="OpenFileButton" Content="파일 열기" Style="{StaticResource ViewerToolbarButtonStyle}"
+                    <Button x:Name="OpenFileButton" Style="{StaticResource ViewerToolbarButtonStyle}"
                             Visibility="{Binding OpenedFileVisibility}"
                             Command="{Binding OpenFileCommand}" CommandParameter="{Binding ElementName=RootWindow}"
-                            Padding="12,6" ToolTip="미리 볼 파일 열기 (Ctrl+O)" />
+                            AutomationProperties.Name="파일 열기" ToolTip="미리 볼 파일 열기 (Ctrl+O)">
+                        <StackPanel Orientation="Horizontal">
+                            <controls:AppIcon Kind="Open" Margin="0,0,7,0" />
+                            <TextBlock Text="파일 열기" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </DockPanel>
         </Border>
 
         <Popup x:Name="SettingsPopup" PlacementTarget="{Binding ElementName=SettingsButton}"
                Placement="Custom" StaysOpen="False" AllowsTransparency="True">
-            <Border Style="{StaticResource FlyoutCardStyle}" Width="352" PreviewKeyDown="OnSettingsPreviewKeyDown"
+            <Border Style="{StaticResource FlyoutCardStyle}" Width="392" PreviewKeyDown="OnSettingsPreviewKeyDown"
                     KeyboardNavigation.TabNavigation="Cycle">
                 <DockPanel>
                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-                        <Button x:Name="SettingsCloseButton" DockPanel.Dock="Right" Content="닫기" Style="{StaticResource ViewerToolbarButtonStyle}"
-                                Click="OnCloseSettingsClick" AutomationProperties.Name="설정 닫기" />
+                        <Button x:Name="SettingsCloseButton" DockPanel.Dock="Right" Style="{StaticResource IconToolbarButtonStyle}"
+                                Click="OnCloseSettingsClick" AutomationProperties.Name="설정 닫기" ToolTip="설정 닫기 (Esc)">
+                            <controls:AppIcon Kind="Close" />
+                        </Button>
                         <TextBlock Text="설정" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
                     </DockPanel>
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="350">
                         <StackPanel Margin="0,0,6,0">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <controls:AppIcon Kind="Palette" Foreground="{DynamicResource AppAccentTextBrush}" Margin="0,0,6,0" />
+                                <TextBlock Text="앱 테마" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <ListBox x:Name="AppThemePicker" ItemContainerStyle="{StaticResource ThemeTileStyle}"
+                                     SelectedValuePath="Theme" Background="Transparent" BorderThickness="0"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="앱 테마">
+                                <ListBox.ItemsPanel>
+                                    <ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate>
+                                </ListBox.ItemsPanel>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <Border Width="34" Height="20" CornerRadius="5" Background="{Binding Swatch}"
+                                                    BorderThickness="1" BorderBrush="{DynamicResource AppBorderBrush}">
+                                                <Border Width="13" Height="5" CornerRadius="2" Background="{Binding Accent}" />
+                                            </Border>
+                                            <TextBlock Text="{Binding Name}" FontSize="11" HorizontalAlignment="Center" Margin="0,3,0,0" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <TextBlock x:Name="AppThemeSaveMessage" Foreground="{DynamicResource AppWarningBrush}"
+                                       TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed" />
+                            <Separator Margin="0,12,0,10" Background="{DynamicResource AppBorderBrush}" />
                             <StackPanel x:Name="ExplorerSettingsGroup" Margin="0,0,0,16">
-                                <TextBlock Text="탐색기" Style="{StaticResource FlyoutHeadingStyle}" />
-                                <CheckBox x:Name="ExplorerIntegrationToggle" Content="Space 키로 미리보기" Foreground="#F3F4F6"
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                    <controls:AppIcon Kind="Explorer" Foreground="{DynamicResource AppAccentTextBrush}" Margin="0,0,6,0" />
+                                    <TextBlock Text="탐색기" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <CheckBox x:Name="ExplorerIntegrationToggle" Content="Space 키로 미리보기" Foreground="{DynamicResource AppTextBrush}"
                                           Click="OnExplorerIntegrationToggleClick" />
                                 <TextBlock x:Name="ExplorerIntegrationMessage" Style="{StaticResource FlyoutHelpStyle}"
                                            Text="모아뷰가 켜져 있을 때 탐색기에서 파일 하나를 선택하고 Space를 누르세요." />
                             </StackPanel>
-                            <TextBlock Text="마크다운" Style="{StaticResource FlyoutHeadingStyle}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <controls:AppIcon Kind="Markdown" Foreground="{DynamicResource AppAccentTextBrush}" Margin="0,0,6,0" />
+                                <TextBlock Text="마크다운" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
                             <DockPanel Margin="0,0,0,2" LastChildFill="False">
-                                <TextBlock Text="테마" VerticalAlignment="Center" Margin="0,0,12,0" />
-                                <ComboBox x:Name="MarkdownThemePicker" Width="120" Style="{StaticResource DarkToolbarComboBoxStyle}"
+                                <TextBlock Text="읽기 테마" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                <ComboBox x:Name="MarkdownThemePicker" Width="120" Style="{StaticResource ToolbarComboBoxStyle}"
                                           ItemsSource="{Binding MarkdownThemes}" SelectedItem="{Binding SelectedMarkdownTheme, Mode=TwoWay}"
                                           DisplayMemberPath="Name" AutomationProperties.Name="마크다운 미리보기 테마" />
                             </DockPanel>
-                            <TextBlock Text="선택한 테마는 다음 실행에도 유지됩니다." Style="{StaticResource FlyoutHelpStyle}" />
+                            <TextBlock Text="마크다운 문서의 색을 따로 고를 수 있어요." Style="{StaticResource FlyoutHelpStyle}" />
                             <TextBlock Text="{Binding MarkdownSettingsMessage}" Visibility="{Binding MarkdownSettingsMessageVisibility}"
-                                       Foreground="#FCD34D" TextWrapping="Wrap" Margin="0,6,0,0" />
-                            <Expander Header="지원 파일과 단축키" Foreground="#F3F4F6" Margin="0,16,0,0">
+                                       Foreground="{DynamicResource AppWarningBrush}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <Expander AutomationProperties.Name="지원 파일과 단축키" Foreground="{DynamicResource AppTextBrush}" Margin="0,16,0,0">
+                                <Expander.Header>
+                                    <StackPanel Orientation="Horizontal">
+                                        <controls:AppIcon Kind="Help" Width="15" Height="15" Foreground="{DynamicResource AppAccentTextBrush}" Margin="0,0,6,0" />
+                                        <TextBlock Text="지원 파일과 단축키" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Expander.Header>
                                 <StackPanel Margin="14,0,0,0">
                                     <TextBlock x:Name="SupportedFormatsBanner" Text="{Binding SupportedFormatsDetail}"
                                                Style="{StaticResource FlyoutHelpStyle}" />
@@ -328,28 +462,44 @@
         </Popup>
 
         <Border x:Name="ViewerToolbar" Grid.Row="1" Visibility="{Binding ViewerToolbarVisibility}"
-                Background="#1B2028" BorderBrush="#303844" BorderThickness="0,0,0,1" Padding="16,6">
+                Background="{DynamicResource AppWindowBrush}" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0,0,0,1" Padding="16,6">
             <WrapPanel VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Margin="0,0,14,0" Visibility="{Binding NavigationVisibility}">
-                    <Button x:Name="PreviousImageButton" Content="‹ 이전" Style="{StaticResource ViewerToolbarButtonStyle}"
-                            Command="{Binding PreviousImageCommand}" ToolTip="이전 이미지 (← / PageUp)" />
+                    <Button x:Name="PreviousImageButton" Style="{StaticResource IconToolbarButtonStyle}"
+                            Command="{Binding PreviousImageCommand}" AutomationProperties.Name="이전 이미지"
+                            ToolTip="이전 이미지 (← / PageUp)">
+                        <controls:AppIcon Kind="Previous" />
+                    </Button>
                     <TextBlock x:Name="FolderPositionText" Text="{Binding FolderPositionDisplay}" MinWidth="42"
-                               TextAlignment="Center" Foreground="#AAB4C3" FontSize="12" VerticalAlignment="Center" Margin="4,0" />
-                    <Button x:Name="NextImageButton" Content="다음 ›" Style="{StaticResource ViewerToolbarButtonStyle}"
-                            Command="{Binding NextImageCommand}" ToolTip="다음 이미지 (→ / PageDown)" />
+                               TextAlignment="Center" Foreground="{DynamicResource AppMutedBrush}" FontSize="12" VerticalAlignment="Center" Margin="4,0" />
+                    <Button x:Name="NextImageButton" Style="{StaticResource IconToolbarButtonStyle}"
+                            Command="{Binding NextImageCommand}" AutomationProperties.Name="다음 이미지"
+                            ToolTip="다음 이미지 (→ / PageDown)">
+                        <controls:AppIcon Kind="Next" />
+                    </Button>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Visibility="{Binding ImageVisibility}">
-                    <Button x:Name="ZoomOutButton" Content="−" Style="{StaticResource ViewerToolbarButtonStyle}"
-                            Command="{Binding ZoomOutCommand}" AutomationProperties.Name="축소" ToolTip="축소 (- / Ctrl+-)" />
+                    <Button x:Name="ZoomOutButton" Style="{StaticResource IconToolbarButtonStyle}"
+                            Command="{Binding ZoomOutCommand}" AutomationProperties.Name="축소" ToolTip="축소 (- / Ctrl+-)">
+                        <controls:AppIcon Kind="ZoomOut" />
+                    </Button>
                     <TextBlock x:Name="ZoomStatusText" Text="{Binding EffectiveZoomPercent, StringFormat={}{0}%}" ToolTip="{Binding ZoomDisplay}"
                                MinWidth="48" TextAlignment="Center"
-                               Foreground="#E5E7EB" FontSize="12" VerticalAlignment="Center" Margin="6,0" />
-                    <Button x:Name="ZoomInButton" Content="+" Style="{StaticResource ViewerToolbarButtonStyle}"
-                            Command="{Binding ZoomInCommand}" AutomationProperties.Name="확대" ToolTip="확대 (+ / Ctrl++)" />
-                    <Button x:Name="FitToWindowButton" Content="화면 맞춤" Style="{StaticResource FitModeButtonStyle}"
-                            Command="{Binding ToggleFitToWindowCommand}" Margin="8,0,0,0" ToolTip="창 크기에 맞춤 (F)" />
-                    <Button x:Name="ImageOptionsButton" Content="더보기 ▾" Style="{StaticResource ViewerToolbarButtonStyle}"
-                            Margin="8,0,0,0" Click="OnImageOptionsClick" ToolTip="원본 크기, 회전, 변환 저장" />
+                               Foreground="{DynamicResource AppTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="6,0" />
+                    <Button x:Name="ZoomInButton" Style="{StaticResource IconToolbarButtonStyle}"
+                            Command="{Binding ZoomInCommand}" AutomationProperties.Name="확대" ToolTip="확대 (+ / Ctrl++)">
+                        <controls:AppIcon Kind="ZoomIn" />
+                    </Button>
+                    <Button x:Name="FitToWindowButton" Style="{StaticResource FitModeButtonStyle}"
+                            Command="{Binding ToggleFitToWindowCommand}" Margin="8,0,0,0" AutomationProperties.Name="화면 맞춤"
+                            ToolTip="화면 맞춤 (F)">
+                        <controls:AppIcon Kind="Fit" />
+                    </Button>
+                    <Button x:Name="ImageOptionsButton" Style="{StaticResource IconToolbarButtonStyle}"
+                            Margin="6,0,0,0" Click="OnImageOptionsClick" AutomationProperties.Name="이미지 도구"
+                            ToolTip="이미지 도구 · 원본 크기, 회전, 변환 저장">
+                        <controls:AppIcon Kind="More" />
+                    </Button>
                 </StackPanel>
             </WrapPanel>
         </Border>
@@ -360,29 +510,48 @@
                     KeyboardNavigation.TabNavigation="Cycle">
                 <StackPanel>
                     <DockPanel Margin="0,0,0,12">
-                        <Button x:Name="ImageOptionsCloseButton" DockPanel.Dock="Right" Content="닫기" Style="{StaticResource ViewerToolbarButtonStyle}"
-                                Click="OnCloseImageOptionsClick" AutomationProperties.Name="이미지 도구 닫기" />
+                        <Button x:Name="ImageOptionsCloseButton" DockPanel.Dock="Right" Style="{StaticResource IconToolbarButtonStyle}"
+                                Click="OnCloseImageOptionsClick" AutomationProperties.Name="이미지 도구 닫기" ToolTip="이미지 도구 닫기 (Esc)">
+                            <controls:AppIcon Kind="Close" />
+                        </Button>
                         <TextBlock Text="이미지 도구" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
                     </DockPanel>
-                    <Button x:Name="ActualSizeButton" Content="원본 크기 (100%)" Style="{StaticResource ViewerToolbarButtonStyle}"
-                            Command="{Binding ActualSizeCommand}" HorizontalAlignment="Left" ToolTip="원본 픽셀 크기 (0)" />
+                    <Button x:Name="ActualSizeButton" Style="{StaticResource ViewerToolbarButtonStyle}"
+                            Command="{Binding ActualSizeCommand}" HorizontalAlignment="Left" AutomationProperties.Name="원본 크기"
+                            ToolTip="원본 픽셀 크기 (0)">
+                        <StackPanel Orientation="Horizontal">
+                            <controls:AppIcon Kind="ActualSize" Margin="0,0,7,0" />
+                            <TextBlock Text="원본 크기 (100%)" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                     <WrapPanel Margin="0,8,0,0" VerticalAlignment="Center">
-                        <Button x:Name="RotateLeftButton" Content="왼쪽으로 회전" Style="{StaticResource ViewerToolbarButtonStyle}"
-                                Command="{Binding RotateCounterClockwiseCommand}" Margin="0,0,6,0" ToolTip="왼쪽으로 90° (L)" />
-                        <Button x:Name="RotateRightButton" Content="오른쪽으로 회전" Style="{StaticResource ViewerToolbarButtonStyle}"
-                                Command="{Binding RotateClockwiseCommand}" Margin="0,0,6,0" ToolTip="오른쪽으로 90° (R)" />
-                        <TextBlock x:Name="RotationStatusText" Text="{Binding RotationDisplay}" Foreground="#AAB4C3" VerticalAlignment="Center" />
+                        <Button x:Name="RotateLeftButton" Style="{StaticResource IconToolbarButtonStyle}"
+                                Command="{Binding RotateCounterClockwiseCommand}" Margin="0,0,6,0" AutomationProperties.Name="왼쪽으로 회전"
+                                ToolTip="왼쪽으로 회전 · 90° (L)">
+                            <controls:AppIcon Kind="RotateLeft" />
+                        </Button>
+                        <Button x:Name="RotateRightButton" Style="{StaticResource IconToolbarButtonStyle}"
+                                Command="{Binding RotateClockwiseCommand}" Margin="0,0,6,0" AutomationProperties.Name="오른쪽으로 회전"
+                                ToolTip="오른쪽으로 회전 · 90° (R)">
+                            <controls:AppIcon Kind="RotateRight" />
+                        </Button>
+                        <TextBlock x:Name="RotationStatusText" Text="{Binding RotationDisplay}" Foreground="{DynamicResource AppMutedBrush}" VerticalAlignment="Center" />
                     </WrapPanel>
                     <StackPanel Visibility="{Binding ConversionToolsVisibility}" Margin="0,16,0,0">
                         <TextBlock Text="다른 형식으로 저장" Style="{StaticResource FlyoutHeadingStyle}" />
                         <WrapPanel>
-                            <ComboBox x:Name="ConvertFormatComboBox" Style="{StaticResource DarkToolbarComboBoxStyle}"
+                            <ComboBox x:Name="ConvertFormatComboBox" Style="{StaticResource ToolbarComboBoxStyle}"
                                       ItemsSource="{Binding AvailableConversionFormats}" SelectedItem="{Binding SelectedConversionFormatOption, Mode=TwoWay}"
                                       DisplayMemberPath="DisplayName" IsEnabled="{Binding CanExecuteConversion}"
                                       MinWidth="114" Margin="0,0,8,0" AutomationProperties.Name="저장할 이미지 형식" />
-                            <Button x:Name="ConvertImageButton" Content="변환 저장…" Style="{StaticResource ViewerToolbarButtonStyle}"
+                            <Button x:Name="ConvertImageButton" Style="{StaticResource ViewerToolbarButtonStyle}"
                                     Command="{Binding ConvertImageCommand}" CommandParameter="{Binding ElementName=RootWindow}"
-                                    Click="OnCloseImageOptionsClick" ToolTip="변환 저장 (Ctrl+Shift+S)" />
+                                    Click="OnCloseImageOptionsClick" AutomationProperties.Name="변환 저장" ToolTip="변환 저장 (Ctrl+Shift+S)">
+                                <StackPanel Orientation="Horizontal">
+                                    <controls:AppIcon Kind="Save" Margin="0,0,7,0" />
+                                    <TextBlock Text="변환 저장…" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
                         </WrapPanel>
                     </StackPanel>
                 </StackPanel>
@@ -418,14 +587,14 @@
                 <WrapPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock x:Name="ConversionNoticeTitleText"
                                Text="{Binding ConversionNoticeTitle}"
-                               Foreground="#F9FAFB"
+                               Foreground="{DynamicResource AppTextBrush}"
                                FontSize="12.5"
                                FontWeight="SemiBold"
                                Margin="0,0,8,0"
                                VerticalAlignment="Center" />
                     <TextBlock x:Name="ConversionNoticeMessageText"
                                Text="{Binding ConversionNoticeMessage}"
-                               Foreground="#E5E7EB"
+                               Foreground="{DynamicResource AppTextBrush}"
                                FontSize="12.5"
                                TextWrapping="Wrap"
                                VerticalAlignment="Center" />
@@ -443,10 +612,12 @@
                             Margin="0,0,6,0"
                             ToolTip="방금 변환된 결과 이미지 파일을 미리보기로 엽니다" />
                     <Button x:Name="DismissConversionNoticeButton"
-                            Style="{StaticResource ViewerToolbarButtonStyle}"
-                            Content="닫기"
+                            Style="{StaticResource IconToolbarButtonStyle}"
+                            AutomationProperties.Name="변환 안내 닫기"
                             Command="{Binding DismissConversionNoticeCommand}"
-                            ToolTip="변환 안내 배너 닫기" />
+                            ToolTip="변환 안내 닫기">
+                        <controls:AppIcon Kind="Close" />
+                    </Button>
                 </StackPanel>
             </Grid>
         </Border>
@@ -454,42 +625,57 @@
         <!-- 본문 미리보기 영역 -->
         <Grid x:Name="ContentHostGrid"
               Grid.Row="3"
-              Background="#14161A"
+              Background="{DynamicResource AppPreviewBrush}"
               SizeChanged="OnContentHostSizeChanged">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="{Binding ArchiveColumnWidth}" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
             <DockPanel x:Name="ArchivePanel" Grid.Column="0" Visibility="{Binding ArchiveVisibility}"
-                       Background="#20242C" Margin="0,0,1,0">
+                       Background="{DynamicResource AppSurfaceBrush}" Margin="0,0,1,0">
                 <TextBlock DockPanel.Dock="Top" Text="{Binding ArchiveSummary}" Margin="12" FontWeight="SemiBold" />
                 <ListBox x:Name="ArchiveEntryList" ItemsSource="{Binding ArchiveEntries}"
-                         SelectedItem="{Binding SelectedArchiveEntry, Mode=TwoWay}" Background="#20242C"
-                         Foreground="#E5E7EB" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                         SelectedItem="{Binding SelectedArchiveEntry, Mode=TwoWay}" Background="{DynamicResource AppSurfaceBrush}"
+                         ItemContainerStyle="{StaticResource PreviewEntryStyle}"
+                         Foreground="{DynamicResource AppTextBrush}" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <StackPanel Margin="4,6" MaxWidth="200">
-                                <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
-                                <TextBlock Text="{Binding Description}" Foreground="#9CA3AF" FontSize="11" Margin="0,4,0,0" />
-                            </StackPanel>
+                            <DockPanel>
+                                <controls:AppIcon x:Name="EntryIcon" DockPanel.Dock="Left" Kind="File" Width="15" Height="15"
+                                                  Foreground="{DynamicResource AppMutedBrush}" VerticalAlignment="Top" Margin="0,2,7,0" />
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Description}" Foreground="{DynamicResource AppMutedBrush}" FontSize="11" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </DockPanel>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsDirectory}" Value="True">
+                                    <Setter TargetName="EntryIcon" Property="Kind" Value="Open" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
             </DockPanel>
             <DockPanel x:Name="PurPanel" Grid.Column="0" Visibility="{Binding PurVisibility}"
-                       Background="#20242C" Margin="0,0,1,0">
+                       Background="{DynamicResource AppSurfaceBrush}" Margin="0,0,1,0">
                 <TextBlock DockPanel.Dock="Top" Text="{Binding PurSummary}" Margin="12" FontWeight="SemiBold" />
                 <TextBlock DockPanel.Dock="Top" Text="{Binding ContentDescription}" Margin="12,0,12,12"
-                           Foreground="#93C5FD" TextWrapping="Wrap" FontSize="12" />
+                           Foreground="{DynamicResource AppAccentTextBrush}" TextWrapping="Wrap" FontSize="12" />
                 <ListBox x:Name="PurImageList" ItemsSource="{Binding PurImages}"
-                         SelectedItem="{Binding SelectedPurImage, Mode=TwoWay}" Background="#20242C"
-                         Foreground="#E5E7EB" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                         SelectedItem="{Binding SelectedPurImage, Mode=TwoWay}" Background="{DynamicResource AppSurfaceBrush}"
+                         ItemContainerStyle="{StaticResource PreviewEntryStyle}"
+                         Foreground="{DynamicResource AppTextBrush}" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <StackPanel Margin="4,6" MaxWidth="200">
-                                <TextBlock Text="{Binding Name}" />
-                                <TextBlock Text="{Binding Description}" Foreground="#9CA3AF" FontSize="11" Margin="0,4,0,0" />
-                            </StackPanel>
+                            <DockPanel>
+                                <controls:AppIcon DockPanel.Dock="Left" Kind="Image" Width="15" Height="15"
+                                                  Foreground="{DynamicResource AppMutedBrush}" VerticalAlignment="Top" Margin="0,2,7,0" />
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}" />
+                                    <TextBlock Text="{Binding Description}" Foreground="{DynamicResource AppMutedBrush}" FontSize="11" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </DockPanel>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
@@ -497,24 +683,24 @@
             <Border x:Name="ArchivePlaceholder" Grid.Column="1" Visibility="{Binding ArchivePlaceholderVisibility}" Padding="24">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <TextBlock Text="{Binding StatusTitle}" FontSize="18" TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding StatusMessage}" Foreground="#9CA3AF" TextWrapping="Wrap" Margin="0,12,0,0" />
+                    <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource AppMutedBrush}" TextWrapping="Wrap" Margin="0,12,0,0" />
                 </StackPanel>
             </Border>
             <DockPanel x:Name="TextViewport" Grid.Column="1" Visibility="{Binding TextVisibility}" Margin="16">
-                <TextBlock DockPanel.Dock="Top" Text="{Binding ContentDescription}" Foreground="#93C5FD" Margin="0,0,0,10" TextWrapping="Wrap" />
+                <TextBlock DockPanel.Dock="Top" Text="{Binding ContentDescription}" Foreground="{DynamicResource AppAccentTextBrush}" Margin="0,0,0,10" TextWrapping="Wrap" />
                 <WrapPanel x:Name="MarkdownToolbar" DockPanel.Dock="Top" Visibility="{Binding MarkdownToolbarVisibility}" Margin="0,0,0,10">
                     <CheckBox x:Name="MarkdownSourceToggle" Content="원문 보기" IsChecked="{Binding ShowMarkdownSource}"
-                              VerticalAlignment="Center" Foreground="#E5E7EB" />
+                              VerticalAlignment="Center" Foreground="{DynamicResource AppTextBrush}" />
                 </WrapPanel>
                 <ComboBox x:Name="DocumentSectionPicker" DockPanel.Dock="Top" Margin="0,0,0,12"
                           Visibility="{Binding DocumentSectionVisibility}"
                           ItemsSource="{Binding DocumentSections}" SelectedItem="{Binding SelectedDocumentSection, Mode=TwoWay}"
-                          DisplayMemberPath="Title" Style="{StaticResource DarkToolbarComboBoxStyle}" />
+                          DisplayMemberPath="Title" Style="{StaticResource ToolbarComboBoxStyle}" />
                 <Grid>
                 <TextBox x:Name="PreviewText" Text="{Binding TextContent, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True"
                          Visibility="{Binding TextSourceVisibility}"
                          TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
-                         Background="{Binding TextBackground}" Foreground="{Binding TextForeground}" BorderBrush="{Binding TextBorderBrush}" Padding="16"
+                         Style="{StaticResource PreviewSourceStyle}" Padding="16"
                          FontFamily="Consolas, Malgun Gothic" FontSize="14" />
                 <controls:MarkdownPreviewControl x:Name="MarkdownPreview" Markdown="{Binding MarkdownContent}" Theme="{Binding SelectedMarkdownTheme}"
                                                  Visibility="{Binding MarkdownRenderedVisibility}" />
@@ -530,8 +716,8 @@
                     MaxWidth="440"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
-                    Background="#1C222D"
-                    BorderBrush="#394456"
+                    Background="{DynamicResource AppSurfaceBrush}"
+                    BorderBrush="{DynamicResource AppBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="16"
                     Padding="26,24"
@@ -543,18 +729,23 @@
                                Text="{Binding StatusTitle}"
                                FontSize="23"
                                FontWeight="SemiBold"
-                               Foreground="#F9FAFB"
+                               Foreground="{DynamicResource AppTextBrush}"
                                TextAlignment="Center" Margin="0,0,0,8" />
                     <TextBlock x:Name="EmptyStateMessage"
                                Text="{Binding StatusMessage}"
                                FontSize="13.5"
-                               Foreground="#D1D5DB"
+                               Foreground="{DynamicResource AppMutedBrush}"
                                TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,18" />
-                    <Button x:Name="EmptyOpenFileButton" Content="파일 열기" Style="{StaticResource ViewerToolbarButtonStyle}"
+                    <Button x:Name="EmptyOpenFileButton" Style="{StaticResource PrimaryToolbarButtonStyle}"
                             Command="{Binding OpenFileCommand}" CommandParameter="{Binding ElementName=RootWindow}"
-                            HorizontalAlignment="Center" Background="#435BE4" BorderBrush="#788BF6"
-                            FontSize="14" FontWeight="SemiBold" Padding="22,8" />
-                    <TextBlock Text="Ctrl+O로도 열 수 있어요" Foreground="#AAB4C3" FontSize="12"
+                            HorizontalAlignment="Center" AutomationProperties.Name="파일 열기" ToolTip="파일 열기 (Ctrl+O)"
+                            FontSize="14" FontWeight="SemiBold" Padding="22,8">
+                        <StackPanel Orientation="Horizontal">
+                            <controls:AppIcon Kind="Open" Margin="0,0,8,0" />
+                            <TextBlock Text="파일 열기" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Text="Ctrl+O로도 열 수 있어요" Foreground="{DynamicResource AppMutedBrush}" FontSize="12"
                                TextAlignment="Center" Margin="0,10,0,0" />
                 </StackPanel>
             </Border>
@@ -595,34 +786,35 @@
                     MaxWidth="580"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
-                    Background="#231F24"
-                    BorderBrush="#6B3A45"
+                    Background="{DynamicResource AppErrorSurfaceBrush}"
+                    BorderBrush="{DynamicResource AppErrorBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="8"
                     Padding="28,24"
                     Margin="24">
                 <StackPanel>
-                    <Border Background="#4C2630"
+                    <Border Background="{DynamicResource AppErrorBadgeBrush}"
                             CornerRadius="4"
                             Padding="8,3"
                             HorizontalAlignment="Left"
                             Margin="0,0,0,10">
-                        <TextBlock x:Name="NoticeBadgeText"
-                                   Text="{Binding NoticeBadgeText}"
-                                   FontSize="11.5"
-                                   FontWeight="SemiBold"
-                                   Foreground="#FCA5A5" />
+                        <StackPanel Orientation="Horizontal">
+                            <controls:AppIcon Kind="Warning" Width="15" Height="15"
+                                              Foreground="{DynamicResource AppErrorTextBrush}" Margin="0,0,6,0" />
+                            <TextBlock x:Name="NoticeBadgeText" Text="{Binding NoticeBadgeText}" FontSize="11.5" FontWeight="SemiBold"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource AppErrorTextBrush}" />
+                        </StackPanel>
                     </Border>
                     <TextBlock x:Name="NoticeTitleText"
                                Text="{Binding StatusTitle}"
                                FontSize="18"
                                FontWeight="SemiBold"
-                               Foreground="#F9FAFB"
+                               Foreground="{DynamicResource AppTextBrush}"
                                Margin="0,0,0,10" />
                     <TextBlock x:Name="NoticeMessageText"
                                Text="{Binding StatusMessage}"
                                FontSize="13.5"
-                               Foreground="#E5E7EB"
+                               Foreground="{DynamicResource AppTextBrush}"
                                TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
@@ -631,8 +823,8 @@
         <!-- 하단 상태 표시줄 -->
         <Border Grid.Row="4"
                 Visibility="{Binding OpenedFileVisibility}"
-                Background="#21252B"
-                BorderBrush="#2F3540"
+                Background="{DynamicResource AppSurfaceBrush}"
+                BorderBrush="{DynamicResource AppBorderBrush}"
                 BorderThickness="0,1,0,0"
                 Padding="14,7">
             <Grid>
@@ -644,7 +836,7 @@
                 <TextBlock x:Name="CurrentFilePathText"
                            Grid.Column="0"
                            Text="{Binding CurrentFileNameDisplay}" ToolTip="{Binding CurrentFilePathDisplay}"
-                           Foreground="#9CA3AF"
+                           Foreground="{DynamicResource AppMutedBrush}"
                            FontSize="12"
                            TextTrimming="CharacterEllipsis"
                            VerticalAlignment="Center"
@@ -653,7 +845,7 @@
                 <TextBlock x:Name="ImageMetadataText"
                            Grid.Column="1"
                            Text="{Binding MetadataSummary}"
-                           Foreground="#D1D5DB"
+                           Foreground="{DynamicResource AppMutedBrush}"
                            FontSize="12"
                            FontWeight="Medium"
                            MaxWidth="300" TextTrimming="CharacterEllipsis" ToolTip="{Binding MetadataSummary}"

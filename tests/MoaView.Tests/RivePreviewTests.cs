@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Wpf;
 using MoaView.Models;
+using MoaView.Services;
 using MoaView.Tests.TestHelpers;
 using MoaView.ViewModels;
 using Xunit;
@@ -17,18 +18,21 @@ public sealed class RivePreviewTests
     {
         var fixture = Path.Combine(AppContext.BaseDirectory, "Fixtures", "data_bind_runtime_test.riv");
         Assert.True(File.Exists(fixture));
+        using var temp = new TempTestDirectory();
+        var appearance = new AppAppearance(new FileAppThemeSettings(temp.GetPath("appearance.json")));
         StaTestRunner.Run(() =>
         {
             SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
             var model = new MainWindowViewModel();
-            var window = new MainWindow(model) { ShowActivated = false, ShowInTaskbar = false };
+            var window = new MainWindow(model, appearance: appearance) { ShowActivated = false, ShowInTaskbar = false };
             try
             {
                 window.Show();
                 model.OpenFile(fixture);
                 Assert.Equal(PreviewStateKind.RiveLoaded, model.State);
                 var host = (Grid)window.FindName("RiveViewport");
-                var ready = Complete(window.WaitForRivePreviewAsync());
+                var load = window.WaitForRivePreviewAsync();
+                var ready = Complete(load);
                 var errorText = string.Join(" ", ((Grid)host.Children[0]).Children.OfType<TextBlock>().Select(t => t.Text));
                 Assert.True(ready, window.RivePlaybackStatus + ": " + errorText);
                 Assert.True(window.VerifyRenderedState());
@@ -41,10 +45,21 @@ public sealed class RivePreviewTests
                 Assert.Equal("true", hasPixels);
                 Assert.Equal("true", Complete(web.ExecuteScriptAsync("document.getElementById('artboard').options.length > 0")));
                 Assert.Equal("\"재생\"", Complete(web.ExecuteScriptAsync("document.getElementById('pause').click(); document.getElementById('pause').textContent")));
+                appearance.Select(AppTheme.Light);
+                Complete(WaitForLightTheme());
+                Assert.Same(load, window.WaitForRivePreviewAsync());
+                Assert.Equal("\"재생\"", Complete(web.ExecuteScriptAsync("document.getElementById('pause').textContent")));
                 Assert.False(model.CanExecuteConversion);
                 model.OpenFile(fixture);
                 Assert.True(Complete(window.WaitForRivePreviewAsync()));
                 Assert.Equal("ready", window.RivePlaybackStatus);
+
+                async Task WaitForLightTheme()
+                {
+                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                    while (await web.ExecuteScriptAsync("document.documentElement.style.colorScheme") != "\"light\"")
+                        await Task.Delay(20, timeout.Token);
+                }
             }
             finally { window.Close(); }
         });

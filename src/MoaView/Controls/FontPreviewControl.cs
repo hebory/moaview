@@ -24,11 +24,13 @@ internal sealed class FontPreviewControl : SpecializedPreviewControl
             var face = new GlyphTypeface(new Uri(_path, UriKind.Absolute));
             var layout = new StackPanel { Margin = new Thickness(24), Orientation = Orientation.Vertical };
             face.FamilyNames.TryGetValue(CultureInfo.CurrentUICulture, out var localizedName);
-            layout.Children.Add(new TextBlock
+            var heading = new TextBlock
             {
                 Text = localizedName ?? face.FamilyNames.Values.FirstOrDefault() ?? "글꼴",
-                Foreground = Brushes.White, FontSize = 20, Margin = new Thickness(0, 0, 0, 24),
-            });
+                FontSize = 20, Margin = new Thickness(0, 0, 0, 24),
+            };
+            heading.SetResourceReference(TextBlock.ForegroundProperty, "AppTextBrush");
+            layout.Children.Add(heading);
             foreach (var sample in new[] { "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", "0123456789 !?@#%&", "모아뷰에서 한글을 미리 봅니다" })
             {
                 if (DrawSample(face, sample) is { } image) layout.Children.Add(image);
@@ -47,7 +49,7 @@ internal sealed class FontPreviewControl : SpecializedPreviewControl
         }
     }
 
-    private static Image? DrawSample(GlyphTypeface face, string sample)
+    private static FrameworkElement? DrawSample(GlyphTypeface face, string sample)
     {
         const double size = 32;
         var glyphs = new List<ushort>();
@@ -59,11 +61,37 @@ internal sealed class FontPreviewControl : SpecializedPreviewControl
             widths.Add(face.AdvanceWidths[glyph] * size);
         }
         if (glyphs.Count == 0) return null;
-        var run = new GlyphRun(face, 0, false, size, 1, glyphs, new Point(), widths, null, null, null, null, null, null);
-        return new Image
+        var run = new GlyphRun(face, 0, false, size, 1, glyphs, new Point(0, size), widths, null, null, null, null, null, null);
+        var sampleControl = new FontGlyphSample { Run = run, Margin = new Thickness(0, 0, 0, 20) };
+        sampleControl.SetResourceReference(Control.ForegroundProperty, "AppTextBrush");
+        return sampleControl;
+    }
+
+    private sealed class FontGlyphSample : Control
+    {
+        public GlyphRun? Run { get; init; }
+
+        protected override Size MeasureOverride(Size availableSize)
         {
-            Source = new DrawingImage(new GlyphRunDrawing(Brushes.White, run)), Stretch = Stretch.Uniform,
-            StretchDirection = StretchDirection.DownOnly, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 20),
-        };
+            var run = Run;
+            return run is null ? Size.Empty : new Size(Math.Min(availableSize.Width, run.AdvanceWidths.Sum()),
+                Math.Max(32, run.FontRenderingEmSize * 1.4));
+        }
+
+        protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+        {
+            base.OnPropertyChanged(e);
+            if (e.Property == ForegroundProperty) InvalidateVisual();
+        }
+
+        protected override void OnRender(DrawingContext drawingContext)
+        {
+            if (Run is not { } run || Foreground is not { } foreground || RenderSize.Width <= 0) return;
+            var width = run.AdvanceWidths.Sum();
+            var scale = width > RenderSize.Width ? RenderSize.Width / width : 1;
+            drawingContext.PushTransform(new ScaleTransform(scale, scale));
+            drawingContext.DrawGlyphRun(foreground, run);
+            drawingContext.Pop();
+        }
     }
 }

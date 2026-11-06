@@ -178,10 +178,12 @@ public sealed class MarkdownPreviewTests
         { ["README.md"] = Encoding.UTF8.GetBytes(Sample), ["note.txt"] = Encoding.UTF8.GetBytes("# 일반 텍스트") });
         var settings = new MarkdownThemeSettings(temp.GetPath("settings.json"));
         Assert.True(settings.TrySave(MarkdownTheme.Light));
+        var appearance = new AppAppearance(new FileAppThemeSettings(temp.GetPath("app-theme.json")));
+        appearance.Select(AppTheme.Forest);
         StaTestRunner.Run(() =>
         {
             var model = Model(settings);
-            var window = new MainWindow(model);
+            var window = new MainWindow(model, appearance: appearance);
             try
             {
                 window.Show(); model.OpenFile(path);
@@ -193,7 +195,7 @@ public sealed class MarkdownPreviewTests
                 model.SelectedArchiveEntry = model.ArchiveEntries[1]; Render(window);
                 Assert.False(model.IsMarkdown);
                 Assert.False(((FrameworkElement)window.FindName("MarkdownToolbar")).IsVisible);
-                Assert.Same(MarkdownThemeOption.All[0].Background, ((TextBox)window.FindName("PreviewText")).Background);
+                Assert.Same(window.FindResource("AppSurfaceBrush"), ((TextBox)window.FindName("PreviewText")).Background);
                 Assert.True(window.VerifyRenderedState());
                 model.SelectedArchiveEntry = model.ArchiveEntries[0]; Render(window);
                 Assert.True(model.IsMarkdownRendered);

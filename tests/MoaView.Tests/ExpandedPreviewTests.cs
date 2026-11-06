@@ -3,10 +3,12 @@ using System.IO;
 using System.IO.Compression;
 using System.Text;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Wpf;
+using MoaView.Controls;
 using MoaView.Models;
 using MoaView.Services;
 using MoaView.Tests.TestHelpers;
@@ -99,7 +101,7 @@ public sealed class ExpandedPreviewTests
             Assert.Equal(SpecializedPreviewKind.Font, window.ViewModel.CurrentResult.SpecializedKind);
             Assert.True(Complete(window.WaitForSpecializedPreviewAsync()), Status(window));
             var content = Host(window).Children.OfType<ScrollViewer>().Single();
-            Assert.NotEmpty(Assert.IsType<StackPanel>(content.Content).Children.OfType<Image>());
+            Assert.NotEmpty(Assert.IsType<StackPanel>(content.Content).Children.OfType<Control>());
         });
     }
 
@@ -123,7 +125,12 @@ public sealed class ExpandedPreviewTests
             var toolbar = layout.Children.OfType<StackPanel>().Single();
             var label = toolbar.Children.OfType<TextBlock>().Single();
             Assert.Equal("1 / 2", label.Text);
-            var next = toolbar.Children.OfType<Button>().Last();
+            var buttons = toolbar.Children.OfType<Button>().ToArray();
+            Assert.Equal("이전 페이지", AutomationProperties.GetName(buttons[0]));
+            Assert.Equal(AppIconKind.Previous, Assert.IsType<AppIcon>(buttons[0].Content).Kind);
+            var next = buttons[1];
+            Assert.Equal("다음 페이지", AutomationProperties.GetName(next));
+            Assert.Equal(AppIconKind.Next, Assert.IsType<AppIcon>(next.Content).Kind);
             next.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(6));
             Complete(WaitForNextPage());
@@ -152,15 +159,21 @@ public sealed class ExpandedPreviewTests
         var dtd = temp.GetPath("dtd.svg");
         File.WriteAllText(dtd, """<!DOCTYPE svg SYSTEM "https://blocked.invalid/"><svg xmlns="http://www.w3.org/2000/svg"/>""");
         Assert.Equal(PreviewStateKind.Error, new FilePreviewService().Load(dtd).State);
+        var appearance = new AppAppearance(new FileAppThemeSettings(temp.GetPath("appearance.json")));
         Preview(window =>
         {
             window.ViewModel.OpenFile(svg);
-            Assert.True(Complete(window.WaitForSpecializedPreviewAsync()), Status(window));
+            var load = window.WaitForSpecializedPreviewAsync();
+            Assert.True(Complete(load), Status(window));
             Assert.True(window.VerifyRenderedState());
             var web = Host(window).Children.OfType<WebView2>().Single();
+            var darkBackground = web.DefaultBackgroundColor;
+            appearance.Select(AppTheme.Light);
+            Assert.NotEqual(darkBackground, web.DefaultBackgroundColor);
+            Assert.Same(load, window.WaitForSpecializedPreviewAsync());
             Assert.Equal("[40,30]", Complete(web.ExecuteScriptAsync(
                 "Array.from(document.images, i => [i.naturalWidth, i.naturalHeight])[0]")));
-        });
+        }, appearance);
     }
 
     [Theory]
@@ -211,19 +224,22 @@ public sealed class ExpandedPreviewTests
             var toolbar = Host(window).Children.OfType<DockPanel>().Single().Children.OfType<StackPanel>().Single();
             var play = toolbar.Children.OfType<Button>().Single();
             Assert.True(play.IsVisible);
-            Assert.Equal("재생", play.Content);
+            Assert.Equal("재생", AutomationProperties.GetName(play));
+            Assert.Equal(AppIconKind.Play, Assert.IsType<AppIcon>(play.Content).Kind);
             play.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            Assert.Equal("일시 정지", play.Content);
+            Assert.Equal("일시 정지", AutomationProperties.GetName(play));
+            Assert.Equal(AppIconKind.Pause, Assert.IsType<AppIcon>(play.Content).Kind);
             play.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            Assert.Equal("재생", play.Content);
+            Assert.Equal("재생", AutomationProperties.GetName(play));
+            Assert.Equal(AppIconKind.Play, Assert.IsType<AppIcon>(play.Content).Kind);
         });
         File.Delete(path);
     }
 
-    private static void Preview(Action<MainWindow> check) => StaTestRunner.Run(() =>
+    private static void Preview(Action<MainWindow> check, AppAppearance? appearance = null) => StaTestRunner.Run(() =>
     {
         SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
-        var window = new MainWindow(new MainWindowViewModel()) { ShowActivated = false, ShowInTaskbar = false };
+        var window = new MainWindow(new MainWindowViewModel(), appearance: appearance) { ShowActivated = false, ShowInTaskbar = false };
         try { window.Show(); check(window); }
         finally { window.Close(); }
     });

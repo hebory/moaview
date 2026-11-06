@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
@@ -14,7 +15,14 @@ namespace MoaView;
 public partial class MainWindow : Window
 {
     private const double ViewportTotalPadding = 32.0;
+    private static readonly object[] AppearanceChoices = AppThemeOption.All.Select(option =>
+    {
+        var palette = AppPalette.For(option.Theme);
+        return (object)new { option.Theme, option.Name, Swatch = AppPalette.Brush(palette.Surface), Accent = AppPalette.Brush(palette.Accent) };
+    }).ToArray();
 
+    private readonly AppAppearance _appearance;
+    private readonly int _paletteResourceIndex;
     private bool _isPanning;
     private Point _panStartPoint;
     private double _panStartHorizontalOffset;
@@ -29,14 +37,23 @@ public partial class MainWindow : Window
     {
     }
 
-    public MainWindow(MainWindowViewModel viewModel, bool isExplorerPreview = false)
+    public MainWindow(MainWindowViewModel viewModel, bool isExplorerPreview = false, AppAppearance? appearance = null)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
 
         ViewModel = viewModel;
         IsExplorerPreview = isExplorerPreview;
+        _appearance = appearance ?? AppAppearance.Current;
         DataContext = viewModel;
         InitializeComponent();
+
+        _paletteResourceIndex = Resources.MergedDictionaries.Count;
+        Resources.MergedDictionaries.Add(AppPalette.For(_appearance.Theme).CreateResources());
+        AppThemePicker.ItemsSource = AppearanceChoices;
+        AppThemePicker.SelectedValue = _appearance.Theme;
+        AppThemePicker.SelectionChanged += OnAppThemeSelected;
+        _appearance.ThemeChanged += OnAppearanceChanged;
+        ShowThemeSaveMessage();
 
         ExplorerSettingsGroup.Visibility = isExplorerPreview ? Visibility.Collapsed : Visibility.Visible;
         ExplorerPreviewHint.Visibility = isExplorerPreview ? Visibility.Visible : Visibility.Collapsed;
@@ -52,6 +69,7 @@ public partial class MainWindow : Window
             ImageOptionsPopup.IsOpen = false;
             ViewModel.ViewResetRequested -= OnViewModelViewResetRequested;
             ViewModel.PropertyChanged -= OnPreviewContentChanged;
+            _appearance.ThemeChanged -= OnAppearanceChanged;
             _rivePreview?.Dispose();
             _specializedPreview?.Dispose();
         };
@@ -63,6 +81,32 @@ public partial class MainWindow : Window
     public string RivePlaybackStatus => _rivePreview?.PlaybackStatus ?? "none";
     public Task<bool> WaitForRivePreviewAsync() => _rivePreview?.Ready ?? Task.FromResult(false);
     public Task<bool> WaitForSpecializedPreviewAsync() => _specializedPreview?.Ready ?? Task.FromResult(false);
+
+    private void OnAppThemeSelected(object sender, SelectionChangedEventArgs e)
+    {
+        if (AppThemePicker.SelectedValue is AppTheme theme) _appearance.Select(theme);
+    }
+
+    private void OnAppearanceChanged(object? sender, EventArgs e)
+    {
+        Resources.MergedDictionaries[_paletteResourceIndex] = AppPalette.For(_appearance.Theme).CreateResources();
+        AppThemePicker.SelectedValue = _appearance.Theme;
+        ShowThemeSaveMessage();
+        ApplyRendererAppearance();
+    }
+
+    private void ShowThemeSaveMessage()
+    {
+        AppThemeSaveMessage.Text = _appearance.SaveMessage;
+        AppThemeSaveMessage.Visibility = string.IsNullOrEmpty(_appearance.SaveMessage) ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void ApplyRendererAppearance()
+    {
+        var palette = AppPalette.For(_appearance.Theme);
+        _rivePreview?.ApplyAppearance(palette.IsDark, palette.Preview, palette.Surface, palette.Text, palette.Muted, palette.Control, palette.Border);
+        if (_specializedPreview is BrowserImagePreviewControl browser) browser.ApplyAppearance(palette.Preview);
+    }
 
     private void OnPreviewContentChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -136,6 +180,7 @@ public partial class MainWindow : Window
         {
             _rivePreview = new RivePreviewControl();
             _rivePreview.CloseRequested += (_, _) => { if (IsExplorerPreview) Close(); };
+            ApplyRendererAppearance();
             RiveViewport.Children.Add(_rivePreview);
         }
         _ = _rivePreview.LoadAsync(data);
@@ -159,6 +204,7 @@ public partial class MainWindow : Window
         };
         if (_specializedPreview is BrowserImagePreviewControl browser)
             browser.CloseRequested += (_, _) => { if (IsExplorerPreview) Close(); };
+        ApplyRendererAppearance();
         if (_specializedPreview is not null) SpecializedViewport.Children.Add(_specializedPreview);
     }
 

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using System.Windows;
+using System.Windows.Media;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 using MoaView.Services;
@@ -15,7 +16,7 @@ internal sealed class BrowserImagePreviewControl : SpecializedPreviewControl
     private const string Page = """
         <!doctype html><html><head><meta charset="utf-8">
         <style>
-        body { margin:0; height:100vh; display:grid; place-items:center; background:#121722; }
+        body { margin:0; height:100vh; display:grid; place-items:center; }
         img { max-width:100%; max-height:100vh; }
         </style></head><body><script>
         const image = new Image();
@@ -39,7 +40,7 @@ internal sealed class BrowserImagePreviewControl : SpecializedPreviewControl
     private const string BpgPage = """
         <!doctype html><html><head><meta charset="utf-8">
         <style>
-        body { margin:0; height:100vh; display:grid; place-items:center; background:#121722; }
+        body { margin:0; height:100vh; display:grid; place-items:center; }
         canvas { max-width:100%; max-height:100vh; object-fit:contain; }
         </style><script src="/decoder.js"></script></head><body><canvas></canvas><script>
         addEventListener('error', () => chrome.webview.postMessage('error'));
@@ -88,6 +89,11 @@ internal sealed class BrowserImagePreviewControl : SpecializedPreviewControl
     private readonly WebView2 _web = new() { Visibility = Visibility.Hidden };
     private readonly CancellationTokenSource _lifetime = new();
     public event EventHandler? CloseRequested;
+
+    internal void ApplyAppearance(Color background)
+    {
+        if (!IsDisposed) _web.DefaultBackgroundColor = System.Drawing.Color.FromArgb(background.R, background.G, background.B);
+    }
 
     public BrowserImagePreviewControl(byte[] bytes, string contentType)
     {

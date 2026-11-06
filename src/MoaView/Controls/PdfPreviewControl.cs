@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -16,17 +17,18 @@ internal sealed class PdfPreviewControl : SpecializedPreviewControl
     private readonly InMemoryRandomAccessStream _source = new();
     private readonly CancellationTokenSource _lifetime = new();
     private readonly Image _image = new() { Stretch = Stretch.Uniform, Margin = new Thickness(12) };
-    private readonly Button _previous = new() { Content = "이전", MinWidth = 68, IsEnabled = false };
-    private readonly Button _next = new() { Content = "다음", MinWidth = 68, IsEnabled = false };
+    private readonly Button _previous = CreateNavigationButton(AppIconKind.Previous, "이전 페이지", "이전 PDF 페이지");
+    private readonly Button _next = CreateNavigationButton(AppIconKind.Next, "다음 페이지", "다음 PDF 페이지");
     private readonly TextBlock _pageLabel = new()
     {
-        Margin = new Thickness(12, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.White,
+        Margin = new Thickness(12, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center,
     };
     private PdfDocument? _document;
     private uint _page;
 
     public PdfPreviewControl(byte[] bytes)
     {
+        _pageLabel.SetResourceReference(TextBlock.ForegroundProperty, "AppTextBrush");
         var toolbar = new StackPanel
         {
             Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 6, 0, 10),
@@ -67,6 +69,15 @@ internal sealed class PdfPreviewControl : SpecializedPreviewControl
                 ShowError("PDF를 열 수 없습니다. 파일이 손상되었거나 암호로 보호되어 있을 수 있습니다.");
             }
         }
+    }
+
+    private static Button CreateNavigationButton(AppIconKind kind, string accessibleName, string toolTip)
+    {
+        var button = new Button { Content = new AppIcon { Kind = kind }, MinWidth = 40, MinHeight = 32,
+            IsEnabled = false, ToolTip = toolTip };
+        button.SetResourceReference(StyleProperty, "ViewerToolbarButtonStyle");
+        AutomationProperties.SetName(button, accessibleName);
+        return button;
     }
 
     private async Task ShowPageAsync(uint index)

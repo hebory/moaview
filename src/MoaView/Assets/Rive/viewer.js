@@ -3,6 +3,7 @@ const canvas = document.getElementById("canvas");
 const artboard = document.getElementById("artboard");
 const animation = document.getElementById("animation");
 const pause = document.getElementById("pause");
+const pauseLabel = document.getElementById("pause-label");
 const restart = document.getElementById("restart");
 const status = document.getElementById("status");
 let player = null;
@@ -33,7 +34,11 @@ function playSelection() {
   player.reset(parameters);
   player.resizeDrawingSurfaceToCanvas();
   paused = false;
-  pause.textContent = "일시정지";
+  updatePlaybackButton();
+}
+function updatePlaybackButton() {
+  pauseLabel.textContent = paused ? "재생" : "일시정지";
+  pause.classList.toggle("paused", paused);
 }
 function playbackOptions() {
   options(animation, [
@@ -53,7 +58,7 @@ pause.addEventListener("click", () => {
   if (!player) return;
   paused = !paused;
   if (paused) player.pause(); else player.play();
-  pause.textContent = paused ? "재생" : "일시정지";
+  updatePlaybackButton();
 });
 new ResizeObserver(() => player?.resizeDrawingSurfaceToCanvas()).observe(canvas);
 window.addEventListener("keydown", event => {
@@ -61,6 +66,15 @@ window.addEventListener("keydown", event => {
 });
 window.chrome.webview.addEventListener("message", event => {
   const payload = event.data;
+  if (payload.type === "theme") {
+    const colors = ["background", "surface", "text", "muted", "control", "border"];
+    if (colors.every(key => typeof payload[key] === "string" && /^#[0-9a-f]{6}$/i.test(payload[key]))) {
+      const root = document.documentElement;
+      for (const key of colors) root.style.setProperty("--app-" + key, payload[key]);
+      root.style.colorScheme = payload.isDark ? "dark" : "light";
+    }
+    return;
+  }
   if (payload.type !== "load" || typeof payload.base64 !== "string" || !Number.isSafeInteger(payload.id)) return;
   player?.cleanup();
   player = null;

@@ -10,7 +10,7 @@
     <StartupObject>MoaView.Program</StartupObject>
     <AssemblyName>MoaView</AssemblyName>
     <RootNamespace>MoaView</RootNamespace>
-    <Version>0.1.6</Version>
+    <Version>0.1.7</Version>
     <Product>MoaView</Product>
     <Description>Windows file preview</Description>
     <ApplicationIcon>Assets\Brand\MoaView.ico</ApplicationIcon>

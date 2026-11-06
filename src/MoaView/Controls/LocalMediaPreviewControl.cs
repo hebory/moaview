@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -12,11 +13,12 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
     {
         LoadedBehavior = MediaState.Manual, UnloadedBehavior = MediaState.Close, Stretch = Stretch.Uniform, Volume = 0.35,
     };
-    private readonly Button _play = new() { Content = "재생", MinWidth = 84 };
+    private readonly Button _play = new() { MinWidth = 40, MinHeight = 32, ToolTip = "재생" };
+    private readonly AppIcon _playIcon = new() { Kind = AppIconKind.Play };
     private readonly Slider _position = new() { Width = 170, Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
     private readonly TextBlock _audioLabel = new()
     {
-        Text = "오디오 미리보기", FontSize = 22, Foreground = Brushes.White,
+        Text = "오디오 미리보기", FontSize = 22,
         VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Visibility = Visibility.Collapsed,
     };
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(250) };
@@ -30,6 +32,14 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
 
     public LocalMediaPreviewControl(string path)
     {
+        _play.Content = _playIcon;
+        _play.SetResourceReference(StyleProperty, "ViewerToolbarButtonStyle");
+        _audioLabel.SetResourceReference(TextBlock.ForegroundProperty, "AppTextBrush");
+        _position.SetResourceReference(Control.BackgroundProperty, "AppControlBrush");
+        _position.SetResourceReference(Control.ForegroundProperty, "AppAccentBrush");
+        _position.SetResourceReference(Control.BorderBrushProperty, "AppBorderBrush");
+        AutomationProperties.SetName(_play, "재생");
+        AutomationProperties.SetName(_position, "재생 위치");
         _toolbar.Children.Add(_play);
         _toolbar.Children.Add(_position);
         var mediaArea = new Grid();
@@ -63,7 +73,7 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
             if (_playing) { Pause(); return; }
             _media.Play();
             _playing = true;
-            _play.Content = "일시 정지";
+            SetPlayAppearance(playing: true);
             _timer.Start();
         };
         _position.ValueChanged += (_, _) =>
@@ -92,8 +102,16 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
     {
         _media.Pause();
         _playing = false;
-        _play.Content = "재생";
+        SetPlayAppearance(playing: false);
         _timer.Stop();
+    }
+
+    private void SetPlayAppearance(bool playing)
+    {
+        var label = playing ? "일시 정지" : "재생";
+        _play.ToolTip = label;
+        AutomationProperties.SetName(_play, label);
+        _playIcon.Kind = playing ? AppIconKind.Pause : AppIconKind.Play;
     }
 
     private void UpdatePosition()

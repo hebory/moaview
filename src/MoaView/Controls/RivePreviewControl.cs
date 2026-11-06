@@ -11,7 +11,7 @@ namespace MoaView.Controls;
 public sealed class RivePreviewControl : Grid, IDisposable
 {
     private const string Origin = "https://moaview-rive.invalid/";
-    private readonly TextBlock _status = new() { Text = "Rive 재생 화면을 준비하고 있습니다.", Foreground = Brushes.LightGray,
+    private readonly TextBlock _status = new() { Text = "Rive 재생 화면을 준비하고 있습니다.",
         TextWrapping = TextWrapping.Wrap, Margin = new Thickness(24), VerticalAlignment = VerticalAlignment.Center };
     private WebView2? _web;
     private readonly HashSet<WebView2> _retiredBrowsers = new();
@@ -19,12 +19,36 @@ public sealed class RivePreviewControl : Grid, IDisposable
     private bool _disposed;
     private bool _pageReady;
     private byte[]? _data;
+    private bool _isDark = true;
+    private Color _background = Color.FromRgb(20, 22, 26);
+    private Color _surface = Color.FromRgb(32, 36, 44);
+    private Color _text = Color.FromRgb(229, 231, 235);
+    private Color _muted = Color.FromRgb(181, 197, 221);
+    private Color _control = Color.FromRgb(48, 56, 70);
+    private Color _border = Color.FromRgb(74, 85, 104);
     private TaskCompletionSource<bool> _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public string PlaybackStatus { get; private set; } = "loading";
     public Task<bool> Ready => _ready.Task;
     public event EventHandler? CloseRequested;
 
-    public RivePreviewControl() => Children.Add(_status);
+    public RivePreviewControl()
+    {
+        SetResourceReference(BackgroundProperty, "AppPreviewBrush");
+        _status.SetResourceReference(TextBlock.ForegroundProperty, "AppMutedBrush");
+        Children.Add(_status);
+    }
+
+    public void ApplyAppearance(bool isDark, Color background, Color surface, Color text, Color muted, Color control, Color border)
+    {
+        _isDark = isDark;
+        _background = background;
+        _surface = surface;
+        _text = text;
+        _muted = muted;
+        _control = control;
+        _border = border;
+        SendAppearance();
+    }
 
     public async Task LoadAsync(byte[] data)
     {
@@ -95,7 +119,7 @@ public sealed class RivePreviewControl : Grid, IDisposable
                 using var message = JsonDocument.Parse(e.WebMessageAsJson);
                 var root = message.RootElement;
                 var type = root.GetProperty("type").GetString();
-                if (type == "pageReady") { _pageReady = true; SendData(); return; }
+                if (type == "pageReady") { _pageReady = true; SendAppearance(); SendData(); return; }
                 if (root.GetProperty("id").GetInt32() != _generation) return;
                 if (type == "close") { CloseRequested?.Invoke(this, EventArgs.Empty); return; }
                 if (type == "error") { Fail(root.GetProperty("message").GetString() ?? "Rive 파일을 표시하지 못했습니다."); return; }
@@ -109,6 +133,22 @@ public sealed class RivePreviewControl : Grid, IDisposable
             catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException or FormatException) { }
         };
     }
+
+    private void SendAppearance()
+    {
+        if (_disposed || !_pageReady || _web?.CoreWebView2 is null) return;
+        try
+        {
+            _web.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new
+            {
+                type = "theme", isDark = _isDark, background = CssColor(_background), surface = CssColor(_surface),
+                text = CssColor(_text), muted = CssColor(_muted), control = CssColor(_control), border = CssColor(_border),
+            }));
+        }
+        catch (InvalidOperationException) { }
+    }
+
+    private static string CssColor(Color color) => $"#{color.R:X2}{color.G:X2}{color.B:X2}";
 
     private void SendData()
     {
