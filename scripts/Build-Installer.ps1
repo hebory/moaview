@@ -1,5 +1,5 @@
 param(
-    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '0.1.4',
+    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '0.1.5',
     [ValidatePattern('^8\.0\.\d+$')][string]$RuntimeVersion = '8.0.33',
     [string]$ExplorerIdentityDirectory,
     [switch]$SkipPublish
@@ -50,8 +50,10 @@ if (!$SkipPublish) {
     if ($LASTEXITCODE -ne 0) { throw 'Application publish failed.' }
 }
 $config = Get-Content -LiteralPath (Join-Path $publish 'MoaView.runtimeconfig.json') -Raw | ConvertFrom-Json
-if (!($config.runtimeOptions.includedFrameworks | Where-Object { $_.name -eq 'Microsoft.WindowsDesktop.App' -and $_.version -eq $RuntimeVersion })) {
-    throw 'Published app does not contain the requested Windows Desktop runtime.'
+foreach ($framework in @('Microsoft.NETCore.App', 'Microsoft.WindowsDesktop.App')) {
+    if (!($config.runtimeOptions.includedFrameworks | Where-Object { $_.name -eq $framework -and $_.version -eq $RuntimeVersion })) {
+        throw "Published app does not contain $framework $RuntimeVersion."
+    }
 }
 if ([Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $publish 'MoaView.exe')).ProductVersion.Split('+')[0] -ne $Version) {
     throw 'Published application version does not match installer version.'

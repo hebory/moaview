@@ -4,7 +4,7 @@ namespace MoaView.Services;
 
 internal static class TextPreviewReader
 {
-    public static string Read(byte[] data)
+    public static string Read(byte[] data, bool isPrefix = false)
     {
         Encoding encoding = new UTF8Encoding(false, true);
         var skip = 0;
@@ -25,11 +25,18 @@ internal static class TextPreviewReader
             encoding = new UnicodeEncoding(true, false, true); skip = 2;
         }
         else if (data.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF })) skip = 3;
-        var text = encoding.GetString(data, skip, data.Length - skip);
+        string text;
+        if (isPrefix)
+        {
+            var chars = new char[encoding.GetMaxCharCount(data.Length - skip)];
+            var count = encoding.GetDecoder().GetChars(data.AsSpan(skip), chars, flush: false);
+            text = new string(chars, 0, count);
+        }
+        else text = encoding.GetString(data, skip, data.Length - skip);
         if (text.Any(c => char.IsControl(c) && c is not ('\t' or '\r' or '\n' or '\f')))
             throw new NotSupportedException("일반 텍스트가 아닌 바이너리 내용은 표시하지 않습니다.");
         return text.Length > PreviewLimits.MaxTextCharacters
             ? text[..PreviewLimits.MaxTextCharacters] + "\n\n[미리보기 길이 제한으로 나머지 내용은 생략했습니다.]"
-            : text;
+            : isPrefix ? text + "\n\n[파일 앞부분만 표시합니다.]" : text;
     }
 }

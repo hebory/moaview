@@ -29,6 +29,10 @@ SHA-256: `59b04c026829e41140e3ac37cd9c75fcac303886689999e79fb5baf04c066b39`.
 
 마크다운 구문 분석에 [공식 Markdig NuGet 패키지 1.5.1](https://www.nuget.org/packages/Markdig/1.5.1)을 사용합니다. .NET 8 대상의 추가 패키지 의존성은 없으며 버전을 고정했습니다. 렌더링은 본 프로젝트의 WPF 코드로 처리합니다. BSD-2-Clause 라이선스, Copyright (c) 2016-2026 Alexandre Mutel. [전체 라이선스](../src/MoaView/Assets/Licenses/Markdig.txt)는 앱 출력 및 배포 폴더에 포함합니다.
 
+## SharpCompress
+
+RAR·7Z·TAR 목록과 내부 항목을 읽기 위해 [공식 SharpCompress NuGet 패키지 0.50.8](https://www.nuget.org/packages/SharpCompress/0.50.8)을 사용합니다. [MIT 라이선스](../src/MoaView/Assets/Licenses/SharpCompress.txt)는 앱 출력 및 배포 폴더에 포함합니다.
+
 ## 문서 형식 구현 참고
 
 - [Microsoft Open XML 문서 구조](https://learn.microsoft.com/office/open-xml/about-the-open-xml-sdk)

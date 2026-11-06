@@ -521,6 +521,7 @@
                 </Grid>
             </DockPanel>
             <Grid x:Name="RiveViewport" Grid.Column="1" Visibility="{Binding RiveVisibility}" />
+            <Grid x:Name="SpecializedViewport" Grid.Column="1" Visibility="{Binding SpecializedVisibility}" />
             <!-- 1) 초기 대기 안내 -->
             <Border x:Name="EmptyStatePanel"
                     Grid.Column="1"

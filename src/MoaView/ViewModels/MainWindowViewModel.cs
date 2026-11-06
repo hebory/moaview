@@ -215,7 +215,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool CanExecuteConversion => !IsEmptyState && !IsArchiveVisible && !IsPurVisible && State is not (PreviewStateKind.TextLoaded or PreviewStateKind.RiveLoaded);
+    public bool CanExecuteConversion => !IsEmptyState && !IsContentPreview;
 
     public bool CanConvertLoadedFormat =>
         !IsArchiveVisible && !IsPurVisible &&
@@ -261,12 +261,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public Visibility ArchiveVisibility => IsArchiveVisible ? Visibility.Visible : Visibility.Collapsed;
     public GridLength ArchiveColumnWidth => IsArchiveVisible || IsPurVisible ? new GridLength(240) : new GridLength(0);
     public IReadOnlyList<ArchiveEntryInfo> ArchiveEntries => _currentResult.Archive?.Entries ?? Array.Empty<ArchiveEntryInfo>();
-    public string ArchiveSummary => $"ZIP · {ArchiveEntries.Count:N0}개 항목";
+    public string ArchiveSummary => $"{_currentResult.Archive?.Format} · {ArchiveEntries.Count:N0}개 항목";
     public Visibility ArchivePlaceholderVisibility => State == PreviewStateKind.ArchiveLoaded ? Visibility.Visible : Visibility.Collapsed;
     public bool IsTextVisible => State == PreviewStateKind.TextLoaded;
     public Visibility TextVisibility => IsTextVisible ? Visibility.Visible : Visibility.Collapsed;
     public bool IsRiveVisible => State == PreviewStateKind.RiveLoaded;
     public Visibility RiveVisibility => IsRiveVisible ? Visibility.Visible : Visibility.Collapsed;
+    public bool IsSpecializedVisible => State == PreviewStateKind.SpecializedLoaded;
+    public Visibility SpecializedVisibility => IsSpecializedVisible ? Visibility.Visible : Visibility.Collapsed;
+    private bool IsContentPreview => IsArchiveVisible || IsPurVisible || IsTextVisible || IsRiveVisible || IsSpecializedVisible;
     public IReadOnlyList<DocumentSection> DocumentSections => _currentResult.Sections;
     public string TextContent => _selectedDocumentSection?.Text ?? string.Empty;
     public string ContentDescription => IsMarkdown ? "Markdown · 서식 미리보기 / 원문 보기" : _currentResult.ContentDescription;
@@ -502,6 +505,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             {
                 PreviewStateKind.TextLoaded => $"{DocumentSections.Count}개 구역 · {FormatFileSize(_currentResult.FileSizeBytes)}",
                 PreviewStateKind.RiveLoaded => $"Rive · {FormatFileSize(_currentResult.FileSizeBytes)}",
+                PreviewStateKind.SpecializedLoaded => $"{ContentDescription} · {FormatFileSize(_currentResult.FileSizeBytes)}",
                 PreviewStateKind.ArchiveLoaded => ArchiveSummary,
                 PreviewStateKind.UnsupportedFormat => "미지원 형식",
                 PreviewStateKind.Error => "미리보기 불가",
@@ -552,7 +556,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
 
         RebuildPreviewBitmap();
-        _navigationContext = IsArchiveVisible || IsPurVisible || State is PreviewStateKind.TextLoaded or PreviewStateKind.RiveLoaded
+        _navigationContext = IsContentPreview
             ? FolderNavigationContext.Empty : _folderNavigationService.ResolveContext(result.FilePath);
 
         NotifyAllStatePropertiesChanged();
@@ -562,7 +566,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public ImageConversionResult ConvertCurrentImage(Window? owner = null)
     {
-        if (IsArchiveVisible || IsPurVisible || State is PreviewStateKind.TextLoaded or PreviewStateKind.RiveLoaded)
+        if (IsContentPreview)
             return BlockContentConversion(null, _selectedConversionFormat);
         if (IsEmptyState)
         {
@@ -622,7 +626,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         ImageFormatKind? targetFormat = null)
     {
         var effectiveTarget = targetFormat ?? _selectedConversionFormat;
-        if (IsArchiveVisible || IsPurVisible || State is PreviewStateKind.TextLoaded or PreviewStateKind.RiveLoaded)
+        if (IsContentPreview)
             return BlockContentConversion(destinationFilePath, effectiveTarget);
         if (SupportedFileFormats.IsConvertibleFormat(effectiveTarget))
         {
@@ -697,7 +701,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public bool MoveNextImage()
     {
-        if (IsArchiveVisible || IsPurVisible || IsTextVisible || IsRiveVisible) return false;
+        if (IsContentPreview) return false;
         var nextPath = _folderNavigationService.GetNextImagePath(_currentResult.FilePath);
         if (string.IsNullOrWhiteSpace(nextPath))
         {
@@ -711,7 +715,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public bool MovePreviousImage()
     {
-        if (IsArchiveVisible || IsPurVisible || IsTextVisible || IsRiveVisible) return false;
+        if (IsContentPreview) return false;
         var previousPath = _folderNavigationService.GetPreviousImagePath(_currentResult.FilePath);
         if (string.IsNullOrWhiteSpace(previousPath))
         {
@@ -921,7 +925,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     private ImageConversionResult BlockContentConversion(string? destination, ImageFormatKind format)
     {
         _lastConversionResult = ImageConversionResult.Unsupported(_currentResult.FilePath, destination, null, format,
-            "이 미리보기는 이미지 변환을 지원하지 않습니다.", "ZIP 내부 항목·문서·텍스트·Rive·PureRef 파일은 내용 확인만 지원합니다. 변환하려면 별도의 원본 이미지 파일을 열어 주세요.");
+            "이 미리보기는 이미지 변환을 지원하지 않습니다.", "변환하려면 JPEG, PNG 또는 BMP 원본 이미지 파일을 열어 주세요.");
         NotifyAllStatePropertiesChanged();
         return _lastConversionResult;
     }

@@ -166,8 +166,8 @@ public sealed class ExplorerPreviewTests
         using var temp = new TempTestDirectory();
         var first = SampleImageFactory.WriteValidImage(temp.GetPath("first.png"), ImageFormatKind.Png, 72, 48);
         var second = SampleImageFactory.WriteValidImage(temp.GetPath("second.bmp"), ImageFormatKind.Bmp, 40, 80);
-        var unsupported = temp.GetPath("notes.pdf");
-        File.WriteAllText(unsupported, "not an image");
+        var extensionless = temp.GetPath("notes");
+        File.WriteAllText(extensionless, "탐색기에서 보는 텍스트");
         var damaged = temp.GetPath("damaged.png");
         File.WriteAllText(damaged, "broken image");
 
@@ -198,9 +198,10 @@ public sealed class ExplorerPreviewTests
                 Assert.Equal(80, peek.ViewModel.DisplayPixelHeight);
                 Assert.True(peek.VerifyRenderedState());
 
-                presenter.Show(unsupported, context);
+                presenter.Show(extensionless, context);
                 Render(peek);
-                Assert.Equal(PreviewStateKind.UnsupportedFormat, peek.ViewModel.State);
+                Assert.Equal(PreviewStateKind.TextLoaded, peek.ViewModel.State);
+                Assert.Contains("탐색기에서 보는 텍스트", peek.ViewModel.TextContent);
                 Assert.True(peek.VerifyRenderedState());
                 presenter.Show(damaged, context);
                 Render(peek);

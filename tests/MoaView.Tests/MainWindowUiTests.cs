@@ -270,8 +270,8 @@ public sealed class MainWindowUiTests
             ImageFormatKind.Png,
             width: 64,
             height: 48);
-        var pdfPath = temp.GetPath("unsupported.pdf");
-        File.WriteAllText(pdfPath, "%PDF-1.7 unsupported");
+        var binaryPath = temp.GetPath("unknown.bin");
+        File.WriteAllBytes(binaryPath, [0, 1, 2]);
         var corruptedJpgPath = temp.GetPath("corrupted.jpg");
         File.WriteAllBytes(corruptedJpgPath, [0xFF, 0xD8, 0x00, 0x22]);
 
@@ -288,11 +288,9 @@ public sealed class MainWindowUiTests
         Assert.Contains("|TITLE=launch-sample.png - 모아뷰 (MoaView)|", imageRun, StringComparison.Ordinal);
         Assert.Contains("|PIXELS=64x48", imageRun, StringComparison.Ordinal);
 
-        var unsupportedRun = RunStartupVerification(exePath, pdfPath);
-        Assert.Contains("MOAVIEW_STARTUP_VERIFIED=True", unsupportedRun, StringComparison.Ordinal);
-        Assert.Contains("|STATE=UnsupportedFormat|", unsupportedRun, StringComparison.Ordinal);
-        Assert.Contains("|VISIBLE=True|", unsupportedRun, StringComparison.Ordinal);
-        Assert.Contains("|BADGE=미지원 형식|", unsupportedRun, StringComparison.Ordinal);
+        var fallbackRun = RunStartupVerification(exePath, binaryPath);
+        Assert.Contains("MOAVIEW_STARTUP_VERIFIED=True|STATE=TextLoaded|", fallbackRun, StringComparison.Ordinal);
+        Assert.Contains("|VISIBLE=True|", fallbackRun, StringComparison.Ordinal);
 
         var errorRun = RunStartupVerification(exePath, corruptedJpgPath);
         Assert.Contains("MOAVIEW_STARTUP_VERIFIED=True", errorRun, StringComparison.Ordinal);

@@ -1,7 +1,7 @@
 param([string]$Installer)
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-if (!$Installer) { $Installer = Join-Path $repo 'artifacts/installer/MoaView-0.1.4-Setup-x64.exe' }
+if (!$Installer) { $Installer = Join-Path $repo 'artifacts/installer/MoaView-0.1.5-Setup-x64.exe' }
 $Installer = (Resolve-Path -LiteralPath $Installer).Path
 $registryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{23C80132-6E95-43B2-AD9B-A283239A5947}_is1'
 $menuKey = 'HKCU:\Software\Classes\*\shell\MoaView.Preview'
@@ -35,6 +35,7 @@ function Assert-Startup([string]$Name, [string]$File, [string]$State) {
             throw "Startup failure: $Name $report $errorText"
         }
         if ($Name -eq 'Rive' -and !$report.Contains('|RIVE=ready|')) { throw 'Rive runtime did not render.' }
+        if ($State -eq 'SpecializedLoaded' -and !$report.Contains('|SPECIALIZED=ready|')) { throw "$Name did not render." }
         $results.Add([pscustomobject]@{Case=$Name;Passed=$true;Report=$report.Trim()})
     } finally { $process.Dispose() }
 }
@@ -76,13 +77,16 @@ try {
     if (!(Test-Path -LiteralPath $registryPath)) { throw 'Uninstall registration missing.' }
     $registered = (Get-ItemProperty -LiteralPath $registryPath).InstallLocation
     if ([IO.Path]::GetFullPath($registered).TrimEnd('\') -ne $target) { throw 'Unexpected registered installation location.' }
-    foreach ($name in @('MoaView.exe','coreclr.dll','hostfxr.dll','PresentationFramework.dll','Assets/Rive/vendor/rive.wasm','Assets/Rive/vendor/rive_fallback.wasm','Assets/Licenses/Markdig.txt','Assets/Licenses/WebView2-LICENSE.txt')) {
+    foreach ($name in @('MoaView.exe','coreclr.dll','hostfxr.dll','PresentationFramework.dll','Microsoft.Windows.SDK.NET.dll','WinRT.Runtime.dll','SharpCompress.dll','Assets/Rive/vendor/rive.wasm','Assets/Rive/vendor/rive_fallback.wasm','Assets/Licenses/Markdig.txt','Assets/Licenses/WebView2-LICENSE.txt','Assets/Licenses/SharpCompress.txt')) {
         if (!(Test-Path -LiteralPath (Join-Path $target $name))) { throw "Installed payload missing: $name" }
     }
     Assert-Startup 'Empty' '' 'Empty'
     $markdown = Join-Path $checkRoot 'preview sample & notes.md'
     '# Installer verification' + "`r`n`r`n**Markdown** preview" | Set-Content -LiteralPath $markdown -Encoding UTF8
     Assert-Startup 'Markdown' $markdown 'TextLoaded'
+    $binary = Join-Path $checkRoot 'unknown.bin'
+    [IO.File]::WriteAllBytes($binary, [byte[]](0, 1, 255))
+    Assert-Startup 'Binary file details' $binary 'TextLoaded'
     if (Get-AppxPackage -Name $identityName) {
         if (Test-Path -LiteralPath $menuKey) { throw 'A legacy menu was left alongside the modern menu.' }
         $results.Add([pscustomobject]@{Case='Windows 11 identity registration';Passed=$true})
@@ -95,6 +99,10 @@ try {
     }
     $rive = Join-Path $repo 'tests/MoaView.Tests/Fixtures/data_bind_runtime_test.riv'
     Assert-Startup 'Rive' $rive 'RiveLoaded'
+    $svg = Join-Path $checkRoot 'sample.svg'
+    '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect width="40" height="30" fill="blue"/></svg>' |
+        Set-Content -LiteralPath $svg -Encoding UTF8
+    Assert-Startup 'SVG' $svg 'SpecializedLoaded'
     $results.Add([pscustomobject]@{Case='Install registration and payload';Passed=$true})
 } finally {
     $uninstaller = Join-Path $target 'unins000.exe'

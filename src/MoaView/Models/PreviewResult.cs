@@ -24,6 +24,8 @@ public sealed record PreviewResult
     public string? ArchiveEntryName { get; init; }
     public IReadOnlyList<DocumentSection> Sections { get; init; } = Array.Empty<DocumentSection>();
     public byte[]? RiveData { get; init; }
+    public SpecializedPreviewKind? SpecializedKind { get; init; }
+    internal byte[]? SpecializedData { get; init; }
     public string ContentDescription { get; init; } = string.Empty;
 
     public static PreviewResult Empty() => new()
@@ -84,3 +86,5 @@ public sealed record PreviewResult
         Message = message,
     };
 }
+
+public enum SpecializedPreviewKind { Pdf, Media, BrowserImage, Font }

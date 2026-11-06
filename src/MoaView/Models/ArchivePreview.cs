@@ -7,6 +7,7 @@ public sealed record ArchiveEntryInfo(int Index, string Name, long Size, long Co
 
 public sealed record ArchivePreview(string FilePath, IReadOnlyList<ArchiveEntryInfo> Entries)
 {
+    public string Format { get; init; } = "ZIP";
     // The immutable snapshot keeps entry indexes stable and releases the original file handle immediately.
     internal byte[] Data { get; init; } = [];
 }

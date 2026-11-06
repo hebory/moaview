@@ -1,14 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <WindowsSdkPackageVersion>10.0.19041.31</WindowsSdkPackageVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <StartupObject>MoaView.Program</StartupObject>
     <AssemblyName>MoaView</AssemblyName>
     <RootNamespace>MoaView</RootNamespace>
-    <Version>0.1.4</Version>
+    <Version>0.1.5</Version>
     <Product>MoaView</Product>
     <Description>Windows file preview</Description>
     <ApplicationIcon>Assets\Brand\MoaView.ico</ApplicationIcon>
@@ -16,9 +18,17 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
     <PackageReference Include="Markdig" Version="1.5.1" />
+    <PackageReference Include="SharpCompress" Version="0.50.8" />
     <Resource Include="Assets\Brand\MoaView.ico" />
     <Resource Include="Assets\Brand\MoaView.png" />
     <Content Include="Assets\Rive\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\Licenses\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <!-- The Windows SDK projection has its own version, separate from the .NET runtime. -->
+  <Target Name="PinWindowsSdkProjection" BeforeTargets="ProcessFrameworkReferences" Condition="'$(RuntimeFrameworkVersion)' != ''">
+    <ItemGroup>
+      <FrameworkReference Condition="'%(FrameworkReference.Identity)' == 'Microsoft.Windows.SDK.NET.Ref'"
+                          RuntimeFrameworkVersion="$(WindowsSdkPackageVersion)" />
+    </ItemGroup>
+  </Target>
 </Project>

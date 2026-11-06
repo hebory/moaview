@@ -168,6 +168,8 @@ public partial class App : Application
                 {
                     if (mainWindow.ViewModel.IsRiveVisible)
                         await mainWindow.WaitForRivePreviewAsync().WaitAsync(TimeSpan.FromSeconds(12));
+                    if (mainWindow.ViewModel.IsSpecializedVisible)
+                        await mainWindow.WaitForSpecializedPreviewAsync().WaitAsync(TimeSpan.FromSeconds(12));
                     var verified = mainWindow.VerifyRenderedState();
                     WriteVerificationReport(mainWindow, verified);
 
@@ -192,6 +194,10 @@ public partial class App : Application
     {
         var vm = window.ViewModel;
         var result = vm.CurrentResult;
+        var specializedReady = window.WaitForSpecializedPreviewAsync();
+        var specializedStatus = vm.IsSpecializedVisible && specializedReady.IsCompletedSuccessfully
+            ? specializedReady.Result ? "ready" : "error"
+            : "none";
         var reportLine =
             $"MOAVIEW_STARTUP_VERIFIED={verified}" +
             $"|STATE={vm.State}" +
@@ -199,6 +205,7 @@ public partial class App : Application
             $"|TITLE={window.Title}" +
             $"|BADGE={vm.NoticeBadgeText}" +
             $"|RIVE={window.RivePlaybackStatus}" +
+            $"|SPECIALIZED={specializedStatus}" +
             $"|PIXELS={result.PixelWidth}x{result.PixelHeight}";
 
         using var stdout = Console.OpenStandardOutput();

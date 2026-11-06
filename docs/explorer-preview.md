@@ -3,7 +3,7 @@
 ## 실행과 조작
 
 1. 저장소 루트에서 `dotnet build -m:1`을 실행합니다.
-2. `src\MoaView\bin\Debug\net8.0-windows\MoaView.exe`를 실행합니다. 현재 개발용 빌드는 .NET 8 Windows Desktop Runtime이 필요합니다.
+2. `src\MoaView\bin\Debug\net8.0-windows10.0.19041.0\MoaView.exe`를 실행합니다. 현재 개발용 빌드는 .NET 8 Windows Desktop Runtime이 필요합니다.
 3. 기본 창의 **설정 → 탐색기 → Space 키로 미리보기**를 확인합니다. 기본 창은 최소화해 두어도 됩니다.
 4. Windows 탐색기의 파일 목록에서 파일 하나를 선택하고 `Space`를 누릅니다.
 5. 탐색기에서 방향키나 마우스로 다른 파일을 선택하면 열린 미리보기 내용이 바뀝니다.

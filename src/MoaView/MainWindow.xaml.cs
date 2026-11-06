@@ -6,6 +6,7 @@ using System.Windows.Threading;
 using MoaView.Models;
 using MoaView.ViewModels;
 using MoaView.Controls;
+using MoaView.Services;
 using System.ComponentModel;
 
 namespace MoaView;
@@ -20,6 +21,8 @@ public partial class MainWindow : Window
     private double _panStartVerticalOffset;
     private RivePreviewControl? _rivePreview;
     private byte[]? _riveData;
+    private SpecializedPreviewControl? _specializedPreview;
+    private PreviewResult? _specializedResult;
 
     public MainWindow()
         : this(new MainWindowViewModel())
@@ -42,7 +45,7 @@ public partial class MainWindow : Window
 
         ViewModel.ViewResetRequested += OnViewModelViewResetRequested;
         ViewModel.PropertyChanged += OnPreviewContentChanged;
-        Loaded += (_, _) => { SyncViewportSize(); UpdateRivePreview(); };
+        Loaded += (_, _) => { SyncViewportSize(); UpdateRivePreview(); UpdateSpecializedPreview(); };
         Closed += (_, _) =>
         {
             SettingsPopup.IsOpen = false;
@@ -50,6 +53,7 @@ public partial class MainWindow : Window
             ViewModel.ViewResetRequested -= OnViewModelViewResetRequested;
             ViewModel.PropertyChanged -= OnPreviewContentChanged;
             _rivePreview?.Dispose();
+            _specializedPreview?.Dispose();
         };
     }
 
@@ -58,11 +62,13 @@ public partial class MainWindow : Window
     public bool IsExplorerPreview { get; }
     public string RivePlaybackStatus => _rivePreview?.PlaybackStatus ?? "none";
     public Task<bool> WaitForRivePreviewAsync() => _rivePreview?.Ready ?? Task.FromResult(false);
+    public Task<bool> WaitForSpecializedPreviewAsync() => _specializedPreview?.Ready ?? Task.FromResult(false);
 
     private void OnPreviewContentChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (!ViewModel.IsImageVisible) ImageOptionsPopup.IsOpen = false;
         UpdateRivePreview();
+        UpdateSpecializedPreview();
     }
 
     private static CustomPopupPlacement[] PlaceFlyout(Size popup, Size anchor, Point _) =>
@@ -135,6 +141,27 @@ public partial class MainWindow : Window
         _ = _rivePreview.LoadAsync(data);
     }
 
+    private void UpdateSpecializedPreview()
+    {
+        var result = ViewModel.IsSpecializedVisible ? ViewModel.CurrentResult : null;
+        if (ReferenceEquals(_specializedResult, result)) return;
+        _specializedResult = result;
+        _specializedPreview?.Dispose();
+        SpecializedViewport.Children.Clear();
+        _specializedPreview = result?.SpecializedKind switch
+        {
+            SpecializedPreviewKind.Pdf when result.SpecializedData is { } pdf => new PdfPreviewControl(pdf),
+            SpecializedPreviewKind.Media when result.FilePath is { } media => new LocalMediaPreviewControl(media),
+            SpecializedPreviewKind.Font when result.FilePath is { } font => new FontPreviewControl(font),
+            SpecializedPreviewKind.BrowserImage when result.SpecializedData is { } image &&
+                FilePreviewService.BrowserImageContentType(result.Extension ?? "") is { } mime => new BrowserImagePreviewControl(image, mime),
+            _ => null,
+        };
+        if (_specializedPreview is BrowserImagePreviewControl browser)
+            browser.CloseRequested += (_, _) => { if (IsExplorerPreview) Close(); };
+        if (_specializedPreview is not null) SpecializedViewport.Children.Add(_specializedPreview);
+    }
+
     public event EventHandler? ExplorerIntegrationToggleRequested;
 
     public bool IsExplorerIntegrationRequested => ExplorerIntegrationToggle.IsChecked == true;
@@ -192,6 +219,8 @@ public partial class MainWindow : Window
                 (ViewModel.IsMarkdownRendered ? MarkdownPreview.IsVisible && MarkdownPreview.Document is not null && MarkdownToolbar.IsVisible :
                     PreviewText.IsVisible && PreviewText.Text == ViewModel.TextContent) && !ImageViewport.IsVisible && PreviewImage.Source is null,
             PreviewStateKind.RiveLoaded => RiveViewport.IsVisible && RivePlaybackStatus is "ready" or "error" &&
+                !ImageViewport.IsVisible && PreviewImage.Source is null,
+            PreviewStateKind.SpecializedLoaded => SpecializedViewport.IsVisible && _specializedPreview?.Ready.IsCompleted == true &&
                 !ImageViewport.IsVisible && PreviewImage.Source is null,
             PreviewStateKind.UnsupportedFormat or PreviewStateKind.Error =>
                 NoticePanel.IsVisible &&

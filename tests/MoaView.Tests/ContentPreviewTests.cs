@@ -23,7 +23,7 @@ public sealed class ContentPreviewTests
     private const string DrawingNs = "http://schemas.openxmlformats.org/drawingml/2006/main";
 
     [Fact]
-    public void Zip_ListsAndPreviewsImageTextAndUnsupportedEntriesWithoutExtractionOrFileLocks()
+    public void Zip_ListsAndPreviewsImageTextAndBinaryEntriesWithoutExtractionOrFileLocks()
     {
         using var temp = new TempTestDirectory();
         var image = SampleImageFactory.WriteValidImage(temp.GetPath("source.png"), ImageFormatKind.Png, 42, 28);
@@ -47,7 +47,9 @@ public sealed class ContentPreviewTests
         var text = service.LoadArchiveEntry(archive, archive.Entries[2]);
         Assert.Contains("안녕하세요", Assert.Single(text.Sections).Text);
         Assert.False(File.Exists(temp.GetPath("outside.txt")));
-        Assert.Equal(PreviewStateKind.UnsupportedFormat, service.LoadArchiveEntry(archive, archive.Entries[3]).State);
+        var binary = service.LoadArchiveEntry(archive, archive.Entries[3]);
+        Assert.Equal(PreviewStateKind.TextLoaded, binary.State);
+        Assert.Contains("01 02 03", binary.Sections[1].Text);
         Assert.Equal(PreviewStateKind.ArchiveLoaded, service.LoadArchiveEntry(archive, archive.Entries[0]).State);
     }
 
@@ -246,7 +248,8 @@ public sealed class ContentPreviewTests
                 Assert.True(window.VerifyRenderedState());
                 list.SelectedIndex = 2;
                 Render(window);
-                Assert.Equal(PreviewStateKind.UnsupportedFormat, model.State);
+                Assert.Equal(PreviewStateKind.TextLoaded, model.State);
+                Assert.Contains("c.bin", model.TextContent);
                 Assert.True(model.IsArchiveVisible);
                 Assert.True(window.VerifyRenderedState());
                 model.OpenFile(image);

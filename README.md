@@ -6,13 +6,13 @@ WorkMesh 프로젝트 채널: `moaview`
 
 ## Windows 설치 파일
 
-현재 설치 파일은 `artifacts/installer/MoaView-0.1.4-Setup-x64.exe`입니다. Windows x64용이며 .NET 8.0.33 런타임을 포함합니다. 현재 사용자에게 시작 메뉴, 제거 기능, 탐색기의 **MoaView로 미리보기** 메뉴를 등록합니다. [설치 및 다시 빌드 안내](docs/install.md)
+현재 설치 파일은 `artifacts/installer/MoaView-0.1.5-Setup-x64.exe`입니다. Windows x64용이며 .NET 8.0.33 런타임을 포함합니다. 현재 사용자에게 시작 메뉴, 제거 기능, 탐색기의 **MoaView로 미리보기** 메뉴를 등록합니다. [설치 및 다시 빌드 안내](docs/install.md)
 
-2026-11-06에 실제 설치 파일로 임시 경로 설치, 앱 시작, 마크다운 표시, Rive 재생, 제거 및 등록 정리를 확인했습니다. 코드 서명이 없는 개발 배포본이며 깨끗한 Windows 환경에서의 추가 검증은 남아 있습니다.
+0.1.4 설치 파일로 임시 경로 설치, 앱 시작, 마크다운 표시, Rive 재생, 제거 및 등록 정리를 확인했습니다. 설치 파일은 코드 서명이 없는 개발 배포본입니다.
 
 재생성: `powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1`. 설치 검증: `powershell -ExecutionPolicy Bypass -File scripts/Test-Installer.ps1` (이미 MoaView를 설치한 계정에서는 중단하며 별도 테스트 계정 필요).
 
-## 현재 구현 범위 (이미지 · 탐색기 연동 · ZIP · 문서 · Rive · PureRef)
+## 미리보기와 탐색기 연동
 
 - 독립 솔루션(`MoaView.sln`), Windows WPF 실행 앱(`src/MoaView`), xUnit 기능 테스트(`tests/MoaView.Tests`) 구성
 - 필요한 NuGet 패키지가 캐시에 있으면 오프라인 복원 가능하며, 단일 노드/노드 비재사용 빌드 설정으로 제한된 환경의 빌드를 지원합니다.
@@ -29,11 +29,12 @@ WorkMesh 프로젝트 채널: `moaview`
   - `BMP` (`.bmp`)
   - `GIF` (`.gif`)
   - `TIFF` (`.tif`, `.tiff`)
-- ZIP 내부 미리보기(C6): 왼쪽 목록에서 내부 항목을 선택해 5종 이미지 또는 일반 텍스트를 확인합니다. 원본 ZIP은 메모리 스냅샷으로 읽고 디스크에 압축을 풀지 않습니다. 암호화·CRC 손상·미지원 항목·크기 제한은 목록을 유지한 채 안내합니다.
+- SVG·WebP·AVIF·ICO·APNG 이미지, 페이지 이동이 있는 PDF, TTF·OTF 글꼴 견본을 표시합니다. MP4·MOV·MKV·MP3·WAV·FLAC 등은 Windows에 설치된 코덱으로 재생합니다.
+- ZIP·RAR·7Z·TAR·TAR.GZ와 CBZ·CBR·CB7을 열어 목록과 내부 항목을 확인합니다. EPUB·APK 등 ZIP 기반 패키지는 내부 목록으로 엽니다. 압축 해제는 메모리에서만 수행하며 솔리드 압축은 목록까지만 표시합니다.
 - 오피스·한글 내용 미리보기: `DOCX` 본문/표, `XLSX` 시트별 셀 주소/저장된 값/수식, `PPTX` 순서별 슬라이드 텍스트/표, `HWP 5.x` 본문과 표 안의 텍스트, `HWPX` 구역별 본문/표를 표시합니다. 구역·시트·슬라이드는 상단 선택 상자로 이동합니다. Office·한글 설치 없이 내용을 읽으며 원본 페이지 배치와 서식은 재현하지 않습니다.
 - Rive 애니메이션(`.riv`): 로컬 Rive Canvas 런타임으로 재생하며 아트보드·상태 머신·애니메이션 선택, 일시정지/재생, 처음부터 재생을 제공합니다. Microsoft Edge WebView2 Runtime이 필요합니다.
 - PureRef(`.pur`) 포함 이미지 미리보기: 내부 PNG/JPEG를 왼쪽 목록에서 골라 확대·축소·회전합니다. 보드 배치·메모·그룹·외부 연결 이미지는 재현하지 않으며 썸네일과 원본 이미지가 함께 표시될 수 있습니다. PureRef 설치 없이 읽는 제한적 지원으로, 실제 PureRef 2.x 저장 파일의 호환성 검증은 남아 있습니다.
-- 일반 텍스트: UTF-8 및 BOM이 있는 UTF-16/UTF-32 내용을 읽기 전용으로 표시합니다. [새 형식 사용 안내와 제한](docs/content-preview.md)
+- 일반 텍스트와 파일 정보: 전용 보기가 없는 형식은 확장자가 없어도 UTF-8 또는 BOM이 있는 Unicode 텍스트를 표시합니다. 바이너리 파일은 크기, 수정 시각, 파일 앞부분의 16진수를 보여줍니다. [형식별 사용 안내와 제한](docs/content-preview.md)
 - 마크다운(`.md`): 제목·강조·목록·인용·표·코드 블록을 서식 미리보기로 표시하고 `원문 보기`로 전환합니다. **설정 → 마크다운 → 테마**에서 다크·라이트·세피아를 선택하면 읽던 위치를 유지한 채 즉시 바뀌며 다음 실행에도 선택이 유지됩니다. ZIP 내부 `.md`에도 적용됩니다.
 - 이미지 보기 조작 및 변환 흐름 (C3 · C4 · C5):
   - 확대·축소(`축소 -` / `확대 +`, `10%` ~ `3200%`, 단축키 `-` / `+`, `Ctrl + 마우스 휠`), 원본 픽셀 크기(`100%`, 단축키 `0` / `/`), 화면 맞춤 전환(`화면 맞춤`, 단축키 `F` / `*`), 확대 상태 스크롤 및 마우스 드래그 패닝
@@ -41,7 +42,7 @@ WorkMesh 프로젝트 채널: `moaview`
   - 같은 폴더 내 지원 이미지 자연 정렬 순서 기준 이전·다음 순환 이동(`◀ 이전` / `다음 ▶`, 단축키 `←` / `→`, `PageUp` / `PageDown`) 및 손상·미지원 파일 경유 이동 복구
   - 이미지 형식 변환(`변환 저장...` 버튼, 단축키 `Ctrl+Shift+S`): `JPEG`·`PNG`·`BMP` 간 상호 변환 저장 및 완료 배너의 `결과 파일 열기`를 통한 즉시 재확인
 - 형식 제한, 원본 보호 및 오류 안내:
-  - 지원 목록 밖의 확장자, 확장자 없는 파일, 폴더, 확장자만 위장된 비지원 데이터는 미지원 또는 열기 실패 사유를 안내합니다.
+  - 폴더를 창에 끌어 놓으면 내부 항목을 표시합니다. 접근 권한이 없거나 전용 보기가 있는 형식의 데이터가 손상된 경우에는 오류 안내를 표시합니다.
   - 이미지 변환은 `JPEG`, `PNG`, `BMP` 간 조합만 지원하며, 미리보기 전용 형식(`GIF`, `TIFF`)이나 그 밖의 미지원 원본·출력 형식 조합은 파일 생성 전에 사전 안내합니다.
   - 원본 파일과 동일한 경로(대소문자·상대 경로·링크 포함) 및 기존 파일 덮어쓰기를 차단하여 원본 데이터를 보호하며, 인코딩·디스크 쓰기 실패 시 임시·불완전 산출물을 즉시 삭제합니다.
   - 손상된 이미지, 빈 파일, 존재하지 않는 경로는 비정상 종료 없이 오류 사유를 안내하며 이전 미리보기 비트맵을 해제합니다.
@@ -68,9 +69,9 @@ dotnet test
 
 샌드박스에서 솔루션 빌드가 오류 메시지 없이 실패한다면 `dotnet build -m:1`로 단일 노드를 명시합니다. VSTest가 localhost 소켓 접근 거부(`10013`)로 연결 시간 초과되는 환경에서는 동일 명령을 반복하지 말고 테스트 실행기의 로컬 통신이 허용된 환경에서 실행해야 합니다.
 
-빌드 후 `src\MoaView\bin\Debug\net8.0-windows\MoaView.exe`를 실행합니다. 현재 빌드는 .NET 8 Windows Desktop Runtime이 필요한 개발용 빌드입니다. 탐색기 연동은 설치·레지스트리 등록 없이 앱이 실행 중인 동안만 동작합니다.
+빌드 후 `src\MoaView\bin\Debug\net8.0-windows10.0.19041.0\MoaView.exe`를 실행합니다. 현재 빌드는 .NET 8 Windows Desktop Runtime이 필요한 개발용 빌드입니다. 탐색기 연동은 설치·레지스트리 등록 없이 앱이 실행 중인 동안만 동작합니다.
 
-RIV 재생에는 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)이 추가로 필요합니다. Rive JS/WASM은 저장소에 고정 버전으로 포함되어 실행 중 CDN에서 내려받지 않습니다. 최초 빌드에는 WebView2 SDK NuGet 패키지 복원이 필요할 수 있습니다. [외부 라이브러리와 라이선스](docs/third-party-notices.md)
+RIV와 SVG·WebP·AVIF·ICO·APNG를 표시하려면 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)이 필요합니다. Rive JS/WASM은 저장소에 고정 버전으로 포함합니다. [외부 라이브러리와 라이선스](docs/third-party-notices.md)
 
 마크다운은 Markdig 1.5.1과 WPF로 표시하며 WebView2 Runtime이 필요하지 않습니다. 최초 빌드에 Markdig NuGet 패키지를 복원합니다.
 
