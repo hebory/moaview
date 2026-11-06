@@ -100,7 +100,9 @@ public sealed class MainWindowUiTests
                 Assert.True(settingsButton.IsVisible);
                 Assert.False(viewerToolbar.IsVisible);
                 Assert.False(formatsBanner.IsVisible);
-                Assert.Contains("JPEG, PNG, BMP, GIF, TIFF", formatsBanner.Text, StringComparison.Ordinal);
+                Assert.Contains("JPEG·JFIF", formatsBanner.Text, StringComparison.Ordinal);
+                Assert.Contains("BMP, GIF, TIFF", formatsBanner.Text, StringComparison.Ordinal);
+                Assert.Contains("카메라 RAW", formatsBanner.Text, StringComparison.Ordinal);
 
                 settingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 PumpAndRender(window);

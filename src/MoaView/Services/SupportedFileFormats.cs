@@ -12,15 +12,67 @@ public static class SupportedFileFormats
         {
             [".jpg"] = ImageFormatKind.Jpeg,
             [".jpeg"] = ImageFormatKind.Jpeg,
+            [".jfif"] = ImageFormatKind.Jpeg,
+            [".jif"] = ImageFormatKind.Jpeg,
+            [".jpe"] = ImageFormatKind.Jpeg,
             [".png"] = ImageFormatKind.Png,
             [".bmp"] = ImageFormatKind.Bmp,
             [".gif"] = ImageFormatKind.Gif,
             [".tif"] = ImageFormatKind.Tiff,
             [".tiff"] = ImageFormatKind.Tiff,
+            [".psd"] = ImageFormatKind.Photoshop,
+            [".psb"] = ImageFormatKind.Photoshop,
+            [".dds"] = ImageFormatKind.Dds,
+            [".jxr"] = ImageFormatKind.JpegXr,
+            [".wdp"] = ImageFormatKind.JpegXr,
+            [".hdp"] = ImageFormatKind.JpegXr,
+            [".jp2"] = ImageFormatKind.Jpeg2000,
+            [".j2k"] = ImageFormatKind.Jpeg2000,
+            [".j2c"] = ImageFormatKind.Jpeg2000,
+            [".jpc"] = ImageFormatKind.Jpeg2000,
+            [".tga"] = ImageFormatKind.Targa,
+            [".pcx"] = ImageFormatKind.Pcx,
+            [".pbm"] = ImageFormatKind.Netpbm,
+            [".pgm"] = ImageFormatKind.Netpbm,
+            [".pnm"] = ImageFormatKind.Netpbm,
+            [".ppm"] = ImageFormatKind.Netpbm,
+            [".pam"] = ImageFormatKind.Netpbm,
+            [".jxl"] = ImageFormatKind.JpegXl,
+            [".exr"] = ImageFormatKind.OpenExr,
+            [".qoi"] = ImageFormatKind.Qoi,
+            [".heic"] = ImageFormatKind.Heif,
+            [".heif"] = ImageFormatKind.Heif,
+            [".hif"] = ImageFormatKind.Heif,
+            [".hdr"] = ImageFormatKind.RadianceHdr,
+            [".rgbe"] = ImageFormatKind.RadianceHdr,
+            [".dng"] = ImageFormatKind.CameraRaw,
+            [".cr2"] = ImageFormatKind.CameraRaw,
+            [".cr3"] = ImageFormatKind.CameraRaw,
+            [".crw"] = ImageFormatKind.CameraRaw,
+            [".nef"] = ImageFormatKind.CameraRaw,
+            [".nrw"] = ImageFormatKind.CameraRaw,
+            [".orf"] = ImageFormatKind.CameraRaw,
+            [".rw2"] = ImageFormatKind.CameraRaw,
+            [".pef"] = ImageFormatKind.CameraRaw,
+            [".sr2"] = ImageFormatKind.CameraRaw,
+            [".srf"] = ImageFormatKind.CameraRaw,
+            [".arw"] = ImageFormatKind.CameraRaw,
+            [".raf"] = ImageFormatKind.CameraRaw,
+            [".raw"] = ImageFormatKind.CameraRaw,
+            [".rwl"] = ImageFormatKind.CameraRaw,
+            [".srw"] = ImageFormatKind.CameraRaw,
+            [".3fr"] = ImageFormatKind.CameraRaw,
+            [".fff"] = ImageFormatKind.CameraRaw,
+            [".iiq"] = ImageFormatKind.CameraRaw,
+            [".erf"] = ImageFormatKind.CameraRaw,
+            [".kdc"] = ImageFormatKind.CameraRaw,
+            [".dcr"] = ImageFormatKind.CameraRaw,
+            [".mrw"] = ImageFormatKind.CameraRaw,
+            [".x3f"] = ImageFormatKind.CameraRaw,
+            [".clip"] = ImageFormatKind.ClipStudio,
         };
 
-    public static IReadOnlyCollection<string> SupportedImageExtensions =>
-        [".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff"];
+    public static IReadOnlyCollection<string> SupportedImageExtensions { get; } = Array.AsReadOnly(ExtensionMap.Keys.ToArray());
 
     public static IReadOnlyCollection<string> ConvertibleImageExtensions =>
         [".jpg", ".jpeg", ".png", ".bmp"];
@@ -43,7 +95,7 @@ public static class SupportedFileFormats
         "이미지 · 문서 · 오디오·동영상 · 압축 파일 · 글꼴 · 텍스트";
 
     public const string SupportedFormatsDetailText =
-        "JPEG, PNG, BMP, GIF, TIFF, SVG, WebP, AVIF, ICO, APNG · PDF, DOCX, XLSX, PPTX, HWP, HWPX · ZIP, RAR, 7Z, TAR · 오디오·동영상 · TTF, OTF · RIV, PUR · 텍스트와 파일 정보";
+        "JPEG·JFIF, PNG·APNG, BMP, GIF, TIFF, SVG, WebP, AVIF, ICO, BPG, HEIC, PSD, DDS, JPEG XR·2000·XL, EXR, HDR, QOI, TGA, PCX, Netpbm, 카메라 RAW, CLIP · PDF·Office·HWP · 압축 · 오디오·동영상 · 글꼴 · RIV·PUR · 텍스트";
 
     public const string SupportedConversionShortText = "변환 지원: JPEG, PNG, BMP";
 
@@ -108,6 +160,15 @@ public static class SupportedFileFormats
         ImageFormatKind.Bmp => "BMP",
         ImageFormatKind.Gif => "GIF",
         ImageFormatKind.Tiff => "TIFF",
+        ImageFormatKind.Photoshop => "PSD / PSB",
+        ImageFormatKind.JpegXr => "JPEG XR",
+        ImageFormatKind.Jpeg2000 => "JPEG 2000",
+        ImageFormatKind.Targa => "TGA",
+        ImageFormatKind.JpegXl => "JPEG XL",
+        ImageFormatKind.OpenExr => "OpenEXR",
+        ImageFormatKind.RadianceHdr => "Radiance HDR",
+        ImageFormatKind.CameraRaw => "카메라 RAW",
+        ImageFormatKind.ClipStudio => "Clip Studio Paint",
         _ => format.ToString().ToUpperInvariant(),
     };
 

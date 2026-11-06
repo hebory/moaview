@@ -163,6 +163,24 @@ public sealed class ExpandedPreviewTests
         });
     }
 
+    [Theory]
+    [InlineData("animation.gif", "GIF 애니메이션")]
+    [InlineData("animation.png", "APNG 애니메이션")]
+    public void AnimatedRasterImages_UseTheRenderingSurface(string fileName, string description)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", fileName);
+        Preview(window =>
+        {
+            window.ViewModel.OpenFile(path);
+            Assert.Equal(description, window.ViewModel.ContentDescription);
+            Assert.True(Complete(window.WaitForSpecializedPreviewAsync()), Status(window));
+            Assert.True(window.VerifyRenderedState());
+            var web = Host(window).Children.OfType<WebView2>().Single();
+            Assert.Equal("[40,32]", Complete(web.ExecuteScriptAsync(
+                "Array.from(document.images, image => [image.naturalWidth, image.naturalHeight])[0]")));
+        });
+    }
+
     [Fact]
     public void Wav_OpensWithExplicitPlaybackControls()
     {

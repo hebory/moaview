@@ -8,8 +8,22 @@
 
 - PDF는 한 페이지씩 표시합니다. 하단의 **이전**, **다음**으로 이동합니다. 암호로 잠긴 문서는 열리지 않습니다.
 - MP4·M4V·MOV·MKV·AVI·WMV·WebM·MPEG와 MP3·WAV·M4A·AAC·FLAC·WMA·OGG·Opus·AIFF는 Windows 미디어 코덱으로 엽니다. 코덱과 파일 인코딩에 따라 재생 가능한 범위가 다릅니다. **재생**을 눌러 시작하고 재생 위치를 옮길 수 있습니다.
-- SVG·WebP·AVIF·ICO·APNG는 로컬 WebView2에서 표시합니다. SVG의 외부 리소스와 스크립트는 실행되지 않습니다. JPEG·PNG·BMP·GIF·TIFF의 확대·회전 조작은 기존 이미지 보기에 적용됩니다.
+- 아래 이미지 형식 표에서 지원 확장자와 미리보기 방식을 확인할 수 있습니다.
 - TTF·OTF는 파일의 글꼴 이름과 글자 견본을 표시합니다. 글꼴 설치 없이 사용할 수 있습니다.
+
+## 이미지 형식
+
+| 형식 | 미리보기 |
+| --- | --- |
+| JPEG·JFIF (`.jpg`, `.jpeg`, `.jfif`, `.jif`, `.jpe`), BMP, PNG, GIF, TIFF | 정지 이미지를 확대·회전하며 확인합니다. TIFF는 첫 페이지를 표시합니다. |
+| WebP, AVIF, APNG, SVG, ICO, 애니메이션 GIF와 PNG | WebView2에서 표시합니다. SVG의 외부 리소스와 스크립트는 실행되지 않습니다. |
+| BPG | 8~14비트 정지 이미지와 8비트 애니메이션을 표시합니다. 높은 비트 심도의 애니메이션은 첫 프레임을 표시합니다. |
+| PSD·PSB, DDS, JPEG XR(`.jxr`, `.wdp`, `.hdp`), JPEG 2000(`.jp2`, `.j2k`, `.j2c`, `.jpc`), JPEG XL(`.jxl`) | PSD의 합성 이미지와 다른 형식의 대표 이미지를 표시합니다. |
+| EXR, Radiance HDR(`.hdr`, `.rgbe`), HEIC(`.heic`, `.heif`, `.hif`), QOI, TGA, PCX, Netpbm(`.pbm`, `.pgm`, `.pnm`, `.ppm`, `.pam`) | 대표 이미지를 표시합니다. HDR 자료는 SDR 미리보기로 표시합니다. |
+| 카메라 RAW | DNG, CR2, CR3, CRW, NEF, NRW, ORF, RW2, PEF, SR2, ARW, RAF 등은 LibRaw가 인식하는 모델과 압축 방식에서 열립니다. |
+| Clip Studio Paint (`.clip`) | 파일에 저장된 캔버스 미리보기를 읽습니다. 저장된 미리보기가 없는 파일과 레이어 편집은 지원 범위에 포함되지 않습니다. |
+
+큰 GIF·PNG 애니메이션은 파일이 32 MB를 넘으면 첫 프레임을 표시합니다. BPG는 한 프레임 최대 419만 픽셀, 프레임 합계 최대 1,600만 픽셀 한도가 있으며 디코더의 메모리 한도도 적용됩니다. DDS의 GPU 텍스처 압축 변형 및 최신 RAW 카메라별 지원 범위는 디코더에 따라 다릅니다.
 
 ## 압축 내부 보기
 
@@ -84,7 +98,7 @@ Microsoft Edge WebView2 Runtime이 없으면 설치 안내가 표시됩니다. �
 | 압축 파일·PDF·Office·HWP·PUR 및 TAR.GZ 압축 해제 크기 | 128 MB |
 | 압축 내부 항목 수 | 4,000개 |
 | 압축 내부 개별 항목 압축 해제 크기 | 32 MB |
-| 웹 이미지 / SVG / 글꼴 | 32 MB / 4 MB / 32 MB |
+| 비트맵 이미지 / 웹 이미지 / SVG / 글꼴 | 128 MB / 32 MB / 4 MB / 32 MB |
 | PDF 페이지 렌더링 | 가로·세로 최대 1,800픽셀 |
 | 전용 보기가 없는 파일의 내용 검사 / 바이너리 표시 | 앞 512 KB / 1,024바이트 |
 | 일반 텍스트 파일/ZIP 내부 텍스트 | 4 MB |

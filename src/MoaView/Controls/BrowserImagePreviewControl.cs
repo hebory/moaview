@@ -11,6 +11,7 @@ internal sealed class BrowserImagePreviewControl : SpecializedPreviewControl
 {
     private const string PageUrl = "https://moaview-image.invalid/index.html";
     private const string ImageUrl = "https://moaview-image.invalid/image";
+    private const string DecoderUrl = "https://moaview-image.invalid/decoder.js";
     private const string Page = """
         <!doctype html><html><head><meta charset="utf-8">
         <style>
@@ -33,6 +34,56 @@ internal sealed class BrowserImagePreviewControl : SpecializedPreviewControl
         """;
     private const string PageHeaders = "Content-Type: text/html; charset=utf-8\r\n" +
         "Content-Security-Policy: default-src 'none'; img-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'";
+    private const string BpgHeaders = "Content-Type: text/html; charset=utf-8\r\n" +
+        "Content-Security-Policy: default-src 'none'; connect-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; base-uri 'none'";
+    private const string BpgPage = """
+        <!doctype html><html><head><meta charset="utf-8">
+        <style>
+        body { margin:0; height:100vh; display:grid; place-items:center; background:#121722; }
+        canvas { max-width:100%; max-height:100vh; object-fit:contain; }
+        </style><script src="/decoder.js"></script></head><body><canvas></canvas><script>
+        addEventListener('error', () => chrome.webview.postMessage('error'));
+        addEventListener('keydown', event => {
+          if ((event.code === 'Space' || event.key === 'Escape') && !event.repeat) {
+            event.preventDefault();
+            chrome.webview.postMessage('close');
+          }
+        });
+        const canvas = document.querySelector('canvas');
+        const context = canvas.getContext('2d');
+        let decodedPixels = 0;
+        const decoder = new BPGDecoder({
+          createImageData(width, height) {
+            const pixels = width * height;
+            if (pixels < 1 || pixels > 4194304 || (decodedPixels += pixels) > 16000000)
+              throw new Error('BPG image exceeds the preview limit.');
+            return context.createImageData(width, height);
+          }
+        });
+        decoder.onload = () => {
+          const frames = decoder.frames;
+          let index = 0;
+          let loops = 0;
+          canvas.width = decoder.imageData.width;
+          canvas.height = decoder.imageData.height;
+          function drawFrame() {
+            const frame = frames[index++];
+            context.putImageData(frame.img, 0, 0);
+            if (index === frames.length) {
+              index = 0;
+              if (decoder.loop_count && ++loops > decoder.loop_count) return;
+            }
+            if (frames.length > 1) {
+              const duration = Number.isFinite(frame.duration) ? frame.duration : 100;
+              setTimeout(drawFrame, Math.max(20, duration));
+            }
+          }
+          drawFrame();
+          chrome.webview.postMessage('ready');
+        };
+        decoder.load('/image');
+        </script></body></html>
+        """;
 
     private readonly WebView2 _web = new() { Visibility = Visibility.Hidden };
     private readonly CancellationTokenSource _lifetime = new();
@@ -69,6 +120,10 @@ internal sealed class BrowserImagePreviewControl : SpecializedPreviewControl
 
     private void ConfigureBrowser(CoreWebView2 core, byte[] bytes, string contentType)
     {
+        var decoder = contentType == BpgPreviewReader.ContentType
+            ? File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Assets", "Bpg", BpgPreviewReader.GetDecoderFile(bytes)))
+            : null;
+        var page = Encoding.UTF8.GetBytes(decoder is null ? Page : BpgPage);
         core.Settings.AreDevToolsEnabled = false;
         core.Settings.AreDefaultContextMenusEnabled = false;
         core.Settings.IsStatusBarEnabled = false;
@@ -85,8 +140,13 @@ internal sealed class BrowserImagePreviewControl : SpecializedPreviewControl
         {
             var environment = core.Environment;
             if (e.Request.Uri == PageUrl && e.ResourceContext == CoreWebView2WebResourceContext.Document)
-                e.Response = environment.CreateWebResourceResponse(new MemoryStream(Encoding.UTF8.GetBytes(Page)), 200, "OK", PageHeaders);
-            else if (e.Request.Uri == ImageUrl && e.ResourceContext == CoreWebView2WebResourceContext.Image)
+                e.Response = environment.CreateWebResourceResponse(new MemoryStream(page, writable: false),
+                    200, "OK", decoder is null ? PageHeaders : BpgHeaders);
+            else if (decoder is not null && e.Request.Uri == DecoderUrl && e.ResourceContext == CoreWebView2WebResourceContext.Script)
+                e.Response = environment.CreateWebResourceResponse(new MemoryStream(decoder, writable: false),
+                    200, "OK", "Content-Type: application/javascript; charset=utf-8");
+            else if (e.Request.Uri == ImageUrl && e.ResourceContext ==
+                (decoder is null ? CoreWebView2WebResourceContext.Image : CoreWebView2WebResourceContext.XmlHttpRequest))
                 e.Response = environment.CreateWebResourceResponse(new MemoryStream(bytes, writable: false), 200, "OK",
                     $"Content-Type: {contentType}\r\nX-Content-Type-Options: nosniff\r\nCache-Control: no-store");
             else

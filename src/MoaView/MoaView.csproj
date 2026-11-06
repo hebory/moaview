@@ -10,7 +10,7 @@
     <StartupObject>MoaView.Program</StartupObject>
     <AssemblyName>MoaView</AssemblyName>
     <RootNamespace>MoaView</RootNamespace>
-    <Version>0.1.5</Version>
+    <Version>0.1.6</Version>
     <Product>MoaView</Product>
     <Description>Windows file preview</Description>
     <ApplicationIcon>Assets\Brand\MoaView.ico</ApplicationIcon>
@@ -19,9 +19,13 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
     <PackageReference Include="Markdig" Version="1.5.1" />
     <PackageReference Include="SharpCompress" Version="0.50.8" />
+    <PackageReference Include="Magick.NET-Q8-x64" Version="15.1.0" GeneratePathProperty="true" />
     <Resource Include="Assets\Brand\MoaView.ico" />
     <Resource Include="Assets\Brand\MoaView.png" />
     <Content Include="Assets\Rive\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\Bpg\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(PkgMagick_NET-Q8-x64)\Notice.txt" Condition="'$(PkgMagick_NET-Q8-x64)' != ''"
+             Link="Assets\Licenses\Magick.NET-Notices.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\Licenses\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <!-- The Windows SDK projection has its own version, separate from the .NET runtime. -->

@@ -1,5 +1,5 @@
 param(
-    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '0.1.5',
+    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '0.1.6',
     [ValidatePattern('^8\.0\.\d+$')][string]$RuntimeVersion = '8.0.33',
     [string]$ExplorerIdentityDirectory,
     [switch]$SkipPublish
@@ -62,6 +62,14 @@ if ([Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $publish 'MoaView.e
 $packageRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget/packages' }
 $licenseDir = Join-Path $publish 'Assets/Licenses'
 New-Item -ItemType Directory -Path $licenseDir -Force | Out-Null
+$bpgSource = Join-Path $toolsRoot 'libbpg-0.9.8.tar.gz'
+if (!(Test-Path -LiteralPath $bpgSource)) {
+    Invoke-WebRequest -Uri 'https://bellard.org/bpg/libbpg-0.9.8.tar.gz' -OutFile $bpgSource
+}
+if ((Get-FileHash -LiteralPath $bpgSource -Algorithm SHA256).Hash -ne 'E2E5518FB3AE0883B79E857C640AA15BFC3A4DAAE50DF1096A2CDF3E5A17FE1F') {
+    throw 'libbpg source archive checksum mismatch.'
+}
+Copy-Item -LiteralPath $bpgSource -Destination $licenseDir
 foreach ($package in @('microsoft.netcore.app.runtime.win-x64', 'microsoft.windowsdesktop.app.runtime.win-x64')) {
     $packagePath = Join-Path $packageRoot "$package/$RuntimeVersion"
     foreach ($name in @('LICENSE.TXT', 'LICENSE', 'THIRD-PARTY-NOTICES.TXT')) {

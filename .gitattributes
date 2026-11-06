@@ -1,2 +1,4 @@
 src/MoaView/Assets/Rive/vendor/* -text
+src/MoaView/Assets/Bpg/*.js binary
+src/MoaView/Assets/Licenses/LibBpg-README.txt -text whitespace=-blank-at-eol
 tests/MoaView.Tests/Fixtures/*.riv -text

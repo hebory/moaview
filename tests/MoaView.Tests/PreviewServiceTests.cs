@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using MoaView.Models;
 using MoaView.Services;
 using MoaView.Tests.TestHelpers;
@@ -15,6 +16,7 @@ public sealed class PreviewServiceTests
     [Theory]
     [InlineData("sample.jpg", ImageFormatKind.Jpeg, 48, 32)]
     [InlineData("sample.JPEG", ImageFormatKind.Jpeg, 52, 36)]
+    [InlineData("sample.JFIF", ImageFormatKind.Jpeg, 52, 36)]
     [InlineData("sample.png", ImageFormatKind.Png, 64, 40)]
     [InlineData("sample.BMP", ImageFormatKind.Bmp, 30, 22)]
     [InlineData("sample.gif", ImageFormatKind.Gif, 28, 18)]
@@ -73,6 +75,83 @@ public sealed class PreviewServiceTests
         // 미리보기 로드 이후에도 원본 파일이 잠기지 않고 즉시 삭제 가능해야 합니다.
         File.Delete(filePath);
         Assert.False(File.Exists(filePath));
+    }
+
+    [Fact]
+    public void Load_ExpandedRasterFormatsDecodeIntoDetachedBitmaps()
+    {
+        using var temp = new TempTestDirectory();
+        var service = new FilePreviewService();
+        var ppm = temp.GetPath("pixel.ppm");
+        File.WriteAllBytes(ppm, "P3\n1 1\n255\n255 0 0\n"u8.ToArray());
+        var red = service.Load(ppm);
+        Assert.Equal(PreviewStateKind.ImageLoaded, red.State);
+        Assert.Equal(ImageFormatKind.Netpbm, red.ImageFormat);
+        Assert.True(red.Bitmap!.IsFrozen);
+        var pixel = new byte[4];
+        red.Bitmap.CopyPixels(pixel, 4, 0);
+        Assert.Equal(new byte[] { 0, 0, 255, 255 }, pixel);
+        File.Delete(ppm);
+
+        var jxl = service.Load(Path.Combine(AppContext.BaseDirectory, "Fixtures", "red.jxl"));
+        Assert.Equal(PreviewStateKind.ImageLoaded, jxl.State);
+        Assert.Equal(ImageFormatKind.JpegXl, jxl.ImageFormat);
+        Assert.Equal(40, jxl.PixelWidth);
+        Assert.Equal(32, jxl.PixelHeight);
+
+        var zip = ContentPreviewTests.WriteZip(temp.GetPath("image.zip"), new Dictionary<string, byte[]>
+        {
+            ["picture.jxl"] = File.ReadAllBytes(jxl.FilePath!),
+        });
+        var archive = Assert.IsType<ArchivePreview>(service.Load(zip).Archive);
+        var entry = service.LoadArchiveEntry(archive, Assert.Single(archive.Entries));
+        Assert.Equal(ImageFormatKind.JpegXl, entry.ImageFormat);
+        Assert.Equal(40, entry.PixelWidth);
+        Assert.Equal(zip, entry.FilePath);
+    }
+
+    [Fact]
+    public void Load_JpegXrUsesTheWindowsDecoder()
+    {
+        using var temp = new TempTestDirectory();
+        var path = temp.GetPath("sample.jxr");
+        var pixels = BitmapSource.Create(3, 2, 96, 96, PixelFormats.Bgr24, null, new byte[18], 9);
+        var encoder = new WmpBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(pixels));
+        using (var stream = File.Create(path)) encoder.Save(stream);
+
+        var result = new FilePreviewService().Load(path);
+        Assert.Equal(PreviewStateKind.ImageLoaded, result.State);
+        Assert.Equal(ImageFormatKind.JpegXr, result.ImageFormat);
+        Assert.Equal(3, result.PixelWidth);
+        Assert.Equal(2, result.PixelHeight);
+    }
+
+    [Fact]
+    public void Load_ExtendedDecoderRejectsSpoofedContentsAndOversizedHeaders()
+    {
+        using var temp = new TempTestDirectory();
+        var spoof = SampleImageFactory.WriteValidImage(temp.GetPath("fake.qoi"), ImageFormatKind.Png, 4, 4);
+        Assert.Equal(PreviewStateKind.Error, new FilePreviewService().Load(spoof).State);
+
+        var oversized = temp.GetPath("huge.ppm");
+        File.WriteAllBytes(oversized, "P3\n18000 18000\n255\n0 0 0\n"u8.ToArray());
+        var result = new FilePreviewService().Load(oversized);
+        Assert.Equal(PreviewStateKind.Error, result.State);
+        Assert.Null(result.Bitmap);
+    }
+
+    [Fact]
+    public void Load_ClipReadsTheStoredCanvasPreview()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", "synthetic.clip");
+        var service = new FilePreviewService();
+        var result = service.Load(path);
+        Assert.Equal(PreviewStateKind.ImageLoaded, result.State);
+        Assert.Equal(ImageFormatKind.ClipStudio, result.ImageFormat);
+        Assert.Equal(40, result.PixelWidth);
+        Assert.Equal(32, result.PixelHeight);
+        Assert.Equal(new FileInfo(path).Length, result.FileSizeBytes);
     }
 
     [Theory]

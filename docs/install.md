@@ -1,11 +1,11 @@
 # MoaView Windows 설치
 
-`MoaView-0.1.5-Setup-x64.exe`를 실행해 설치합니다. Windows 10 1809 이상 또는 Windows 11의 x64/호환 환경용입니다. 관리자 권한 없이 현재 사용자에게 설치됩니다.
+`MoaView-0.1.6-Setup-x64.exe`를 실행해 설치합니다. Windows 10 1809 이상 또는 Windows 11의 x64/호환 환경용입니다. 관리자 권한 없이 현재 사용자에게 설치됩니다.
 
 - 기본 경로: `%LOCALAPPDATA%\Programs\MoaView`
 - 시작 메뉴에 MoaView가 등록됩니다. 바탕 화면 바로가기는 설치 중 선택합니다.
 - .NET 8.0.33 Windows Desktop 런타임을 포함하므로 .NET을 따로 설치하지 않습니다.
-- Rive와 SVG·WebP·AVIF·ICO·APNG 미리보기에는 WebView2 Runtime이 필요합니다. 설치되지 않았다면 마지막 화면에서 Microsoft WebView2 설치를 선택할 수 있으며 이 단계에는 인터넷이 필요합니다.
+- Rive와 SVG·WebP·AVIF·ICO·APNG·BPG·GIF 애니메이션 미리보기에는 WebView2 Runtime이 필요합니다. 설치되지 않았다면 마지막 화면에서 Microsoft WebView2 설치를 선택할 수 있으며 이 단계에는 인터넷이 필요합니다.
 - 설치 완료 화면에서 MoaView 실행이 기본 선택됩니다. MoaView가 실행 중일 때 탐색기에서 파일 하나를 선택하고 Space를 눌러 미리봅니다. 기본 창을 최소화해도 사용할 수 있습니다.
 - 파일 하나를 우클릭해 **MoaView로 미리보기**를 선택할 수 있습니다. Windows 11에서는 **추가 옵션 표시** 안에 있습니다. 이 메뉴는 앱을 미리 켜 두지 않아도 사용할 수 있습니다.
 - 현재 설치 파일은 코드 서명이 없는 개발 배포본입니다. Windows의 출처 확인 안내가 나타날 수 있습니다.
@@ -32,7 +32,7 @@ Visual Studio C++ x64 도구, Windows SDK, PowerShell 7이 있는 Windows 빌드
 
 ```powershell
 pwsh -NoProfile -File scripts/Build-ExplorerIdentity.ps1 -Version 0.1.3 -DevelopmentCertificate
-powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1 -Version 0.1.5 -ExplorerIdentityDirectory artifacts/explorer-identity/0.1.3
+powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1 -Version 0.1.6 -ExplorerIdentityDirectory artifacts/explorer-identity/0.1.3
 ```
 
 개발 빌드에서 생성한 공개 `MoaView-Development.cer`는 해당 빌드의 Windows 패키지 등록을 검증할 때 사용합니다. 설치하려는 Windows가 그 인증서를 신뢰해야 하며 설치 프로그램은 인증서 신뢰 저장소를 변경하지 않습니다. 신뢰된 배포용 서명 인증서가 `CurrentUser\My`에 있으면 첫 명령에서 `-DevelopmentCertificate` 대신 `-SigningThumbprint`로 인증서를 지정할 수 있습니다. [Microsoft 패키지 서명 안내](https://learn.microsoft.com/en-us/windows/apps/desktop/modernize/grant-identity-to-nonpackaged-apps#build-and-sign-the-identity-package)

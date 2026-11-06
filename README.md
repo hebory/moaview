@@ -6,7 +6,7 @@ WorkMesh 프로젝트 채널: `moaview`
 
 ## Windows 설치 파일
 
-현재 설치 파일은 `artifacts/installer/MoaView-0.1.5-Setup-x64.exe`입니다. Windows x64용이며 .NET 8.0.33 런타임을 포함합니다. 현재 사용자에게 시작 메뉴, 제거 기능, 탐색기의 **MoaView로 미리보기** 메뉴를 등록합니다. [설치 및 다시 빌드 안내](docs/install.md)
+현재 설치 파일은 `artifacts/installer/MoaView-0.1.6-Setup-x64.exe`입니다. Windows x64용이며 .NET 8.0.33 런타임을 포함합니다. 현재 사용자에게 시작 메뉴, 제거 기능, 탐색기의 **MoaView로 미리보기** 메뉴를 등록합니다. [설치 및 다시 빌드 안내](docs/install.md)
 
 0.1.4 설치 파일로 임시 경로 설치, 앱 시작, 마크다운 표시, Rive 재생, 제거 및 등록 정리를 확인했습니다. 설치 파일은 코드 서명이 없는 개발 배포본입니다.
 
@@ -23,13 +23,9 @@ WorkMesh 프로젝트 채널: `moaview`
   - 주소창·검색창·이름 변경·메뉴·수정키 조합의 Space는 가로채지 않습니다. 여러 항목 선택, 선택 없음, 가상 Shell 항목은 열지 않습니다.
   - 키 반복 방지, 늦은 탐색기 응답 무효화, 같은 창의 탭 구분, 중복 프로세스의 훅 등록 방지를 포함합니다.
   - 자동 상태 전환·WPF 렌더링 테스트 통과. 실제 탐색기에서의 키 입력·Windows 버전별 탭 동작 검증은 아직 남아 있습니다. [실행 방법과 수동 확인 항목](docs/explorer-preview.md)
-- 지원 이미지 형식 미리보기 및 메타데이터(형식·해상도·크기·회전·배율·폴더 순번) 표시:
-  - `JPEG` (`.jpg`, `.jpeg`)
-  - `PNG` (`.png`)
-  - `BMP` (`.bmp`)
-  - `GIF` (`.gif`)
-  - `TIFF` (`.tif`, `.tiff`)
-- SVG·WebP·AVIF·ICO·APNG 이미지, 페이지 이동이 있는 PDF, TTF·OTF 글꼴 견본을 표시합니다. MP4·MOV·MKV·MP3·WAV·FLAC 등은 Windows에 설치된 코덱으로 재생합니다.
+- JPEG(JFIF 포함), PNG, BMP, GIF, TIFF와 PSD·PSB, DDS, JPEG XR·2000·XL, HEIC, EXR, HDR, QOI, TGA, PCX, Netpbm, 카메라 RAW, Clip Studio Paint의 저장된 캔버스 미리보기를 표시합니다.
+- SVG·WebP·AVIF·ICO·APNG·BPG와 애니메이션 GIF를 WebView2에서 표시합니다. [형식별 보기와 제한](docs/content-preview.md)
+- PDF 페이지와 TTF·OTF 글꼴 견본을 표시합니다. MP4·MOV·MKV·MP3·WAV·FLAC 등은 Windows에 설치된 코덱으로 재생합니다.
 - ZIP·RAR·7Z·TAR·TAR.GZ와 CBZ·CBR·CB7을 열어 목록과 내부 항목을 확인합니다. EPUB·APK 등 ZIP 기반 패키지는 내부 목록으로 엽니다. 압축 해제는 메모리에서만 수행하며 솔리드 압축은 목록까지만 표시합니다.
 - 오피스·한글 내용 미리보기: `DOCX` 본문/표, `XLSX` 시트별 셀 주소/저장된 값/수식, `PPTX` 순서별 슬라이드 텍스트/표, `HWP 5.x` 본문과 표 안의 텍스트, `HWPX` 구역별 본문/표를 표시합니다. 구역·시트·슬라이드는 상단 선택 상자로 이동합니다. Office·한글 설치 없이 내용을 읽으며 원본 페이지 배치와 서식은 재현하지 않습니다.
 - Rive 애니메이션(`.riv`): 로컬 Rive Canvas 런타임으로 재생하며 아트보드·상태 머신·애니메이션 선택, 일시정지/재생, 처음부터 재생을 제공합니다. Microsoft Edge WebView2 Runtime이 필요합니다.
@@ -71,7 +67,7 @@ dotnet test
 
 빌드 후 `src\MoaView\bin\Debug\net8.0-windows10.0.19041.0\MoaView.exe`를 실행합니다. 현재 빌드는 .NET 8 Windows Desktop Runtime이 필요한 개발용 빌드입니다. 탐색기 연동은 설치·레지스트리 등록 없이 앱이 실행 중인 동안만 동작합니다.
 
-RIV와 SVG·WebP·AVIF·ICO·APNG를 표시하려면 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)이 필요합니다. Rive JS/WASM은 저장소에 고정 버전으로 포함합니다. [외부 라이브러리와 라이선스](docs/third-party-notices.md)
+RIV와 웹 이미지·애니메이션을 표시하려면 Microsoft Edge WebView2 Runtime이 필요합니다. Rive와 BPG 디코더는 앱에 포함합니다. [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) · [외부 라이브러리와 라이선스](docs/third-party-notices.md)
 
 마크다운은 Markdig 1.5.1과 WPF로 표시하며 WebView2 Runtime이 필요하지 않습니다. 최초 빌드에 Markdig NuGet 패키지를 복원합니다.
 

@@ -1,7 +1,7 @@
 param([string]$Installer)
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-if (!$Installer) { $Installer = Join-Path $repo 'artifacts/installer/MoaView-0.1.5-Setup-x64.exe' }
+if (!$Installer) { $Installer = Join-Path $repo 'artifacts/installer/MoaView-0.1.6-Setup-x64.exe' }
 $Installer = (Resolve-Path -LiteralPath $Installer).Path
 $registryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{23C80132-6E95-43B2-AD9B-A283239A5947}_is1'
 $menuKey = 'HKCU:\Software\Classes\*\shell\MoaView.Preview'
@@ -87,6 +87,12 @@ try {
     $binary = Join-Path $checkRoot 'unknown.bin'
     [IO.File]::WriteAllBytes($binary, [byte[]](0, 1, 255))
     Assert-Startup 'Binary file details' $binary 'TextLoaded'
+    $ppm = Join-Path $checkRoot 'sample.ppm'
+    [IO.File]::WriteAllText($ppm, "P3`n1 1`n255`n255 0 0`n", [Text.Encoding]::ASCII)
+    Assert-Startup 'PPM image' $ppm 'ImageLoaded'
+    foreach ($name in @('Assets/Licenses/Magick.NET-Notices.txt','Assets/Licenses/libbpg-0.9.8.tar.gz','Assets/Bpg/bpgdec.js','Assets/Bpg/bpgdec8a.js')) {
+        if (!(Test-Path -LiteralPath (Join-Path $target $name))) { throw "Installed image payload missing: $name" }
+    }
     if (Get-AppxPackage -Name $identityName) {
         if (Test-Path -LiteralPath $menuKey) { throw 'A legacy menu was left alongside the modern menu.' }
         $results.Add([pscustomobject]@{Case='Windows 11 identity registration';Passed=$true})

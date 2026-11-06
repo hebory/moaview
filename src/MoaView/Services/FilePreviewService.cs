@@ -17,13 +17,16 @@ public sealed class FilePreviewService : IPreviewService
         ".mp4" or ".m4v" or ".mov" or ".mkv" or ".avi" or ".wmv" or ".webm" or ".mpeg" or ".mpg" or
         ".mp3" or ".wav" or ".m4a" or ".aac" or ".flac" or ".wma" or ".ogg" or ".opus" or ".aiff";
 
-    internal static string? BrowserImageContentType(string extension) => extension switch
+    internal static string? BrowserImageContentType(string extension) => extension.ToLowerInvariant() switch
     {
         ".svg" => "image/svg+xml",
         ".webp" => "image/webp",
         ".avif" => "image/avif",
         ".ico" => "image/x-icon",
         ".apng" => "image/apng",
+        ".png" => "image/png",
+        ".gif" => "image/gif",
+        ".bpg" => BpgPreviewReader.ContentType,
         _ => null,
     };
 
@@ -184,6 +187,7 @@ public sealed class FilePreviewService : IPreviewService
         if (BrowserImageContentType(extension) is not null)
         {
             if (extension == ".svg") ValidateSvg(bytes);
+            if (extension == ".bpg") BpgPreviewReader.GetDecoderFile(bytes);
             return Specialized(name, extension, bytes.LongLength, SpecializedPreviewKind.BrowserImage,
                 extension[1..].ToUpperInvariant(), bytes);
         }

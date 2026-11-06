@@ -3,7 +3,7 @@ using System.IO;
 namespace MoaView.Services;
 
 /// <summary>
-/// 현재 파일과 같은 폴더에 있는 지원 이미지(JPEG, PNG, BMP, GIF, TIFF)를 자연 정렬 순서로 탐색합니다.
+/// 현재 파일과 같은 폴더에 있는 비트맵 미리보기 형식을 자연 정렬 순서로 탐색합니다.
 /// </summary>
 public sealed class FolderImageNavigationService : IFolderNavigationService
 {
