@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -85,16 +86,36 @@ public sealed class MainWindowUiTests
                 var metadataText = (TextBlock)window.FindName("ImageMetadataText")!;
                 var formatsBanner = (TextBlock)window.FindName("SupportedFormatsBanner")!;
                 var openButton = (Button)window.FindName("OpenFileButton")!;
+                var emptyOpenButton = (Button)window.FindName("EmptyOpenFileButton")!;
+                var settingsButton = (Button)window.FindName("SettingsButton")!;
+                var settingsPopup = (Popup)window.FindName("SettingsPopup")!;
+                var viewerToolbar = (FrameworkElement)window.FindName("ViewerToolbar")!;
 
                 // 1) 초기 빈 화면 실제 창 표시 검증
                 Assert.True(window.VerifyRenderedState());
                 Assert.True(emptyPanel.IsVisible);
                 Assert.False(imageViewport.IsVisible);
                 Assert.False(noticePanel.IsVisible);
+                Assert.True(emptyOpenButton.IsVisible);
+                Assert.True(settingsButton.IsVisible);
+                Assert.False(viewerToolbar.IsVisible);
+                Assert.False(formatsBanner.IsVisible);
                 Assert.Contains("JPEG, PNG, BMP, GIF, TIFF", formatsBanner.Text, StringComparison.Ordinal);
 
-                // 2) '파일 선택...' 버튼 명령으로 지원 이미지(TIFF) 열기 및 렌더링 검증
-                openButton.Command.Execute(openButton.CommandParameter);
+                settingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                PumpAndRender(window);
+                Assert.True(settingsPopup.IsOpen);
+                Assert.True(((CheckBox)window.FindName("ExplorerIntegrationToggle")!).IsVisible);
+                Assert.True(((ComboBox)window.FindName("MarkdownThemePicker")!).IsVisible);
+                var settingsPanel = (FrameworkElement)settingsPopup.Child;
+                var escape = new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(settingsPanel)!, 0, Key.Escape)
+                { RoutedEvent = UIElement.PreviewKeyDownEvent };
+                settingsPanel.RaiseEvent(escape);
+                Assert.True(escape.Handled);
+                Assert.False(settingsPopup.IsOpen);
+
+                // 2) 시작 화면 버튼으로 이미지(TIFF) 열기 및 렌더링 검증
+                emptyOpenButton.Command.Execute(emptyOpenButton.CommandParameter);
                 PumpAndRender(window);
 
                 Assert.True(window.VerifyRenderedState());
@@ -107,6 +128,17 @@ public sealed class MainWindowUiTests
                 Assert.Equal(48, renderedBitmap.PixelHeight);
                 Assert.Contains("TIFF", metadataText.Text, StringComparison.Ordinal);
                 Assert.Contains("72 × 48 px", metadataText.Text, StringComparison.Ordinal);
+                Assert.True(viewerToolbar.IsVisible);
+                var imageOptionsButton = (Button)window.FindName("ImageOptionsButton")!;
+                var imageOptionsPopup = (Popup)window.FindName("ImageOptionsPopup")!;
+                var rotateButton = (Button)window.FindName("RotateRightButton")!;
+                Assert.False(rotateButton.IsVisible);
+                imageOptionsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                PumpAndRender(window);
+                Assert.True(imageOptionsPopup.IsOpen);
+                Assert.True(rotateButton.IsVisible);
+                ((Button)window.FindName("ImageOptionsCloseButton")!).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.False(imageOptionsPopup.IsOpen);
 
                 // 3) 미지원 형식(.pdf) 선택 시 이전 이미지가 해제되고 안내 패널이 표시되는지 검증
                 openButton.Command.Execute(openButton.CommandParameter);
@@ -325,7 +357,8 @@ public sealed class MainWindowUiTests
                 // 1) 큰 이미지(1400x1000) 초기 화면 맞춤 렌더링 확인
                 Assert.True(window.VerifyRenderedState());
                 Assert.True(viewModel.IsFitToWindow);
-                Assert.Contains("화면 맞춤", zoomStatusText.Text, StringComparison.Ordinal);
+                Assert.Equal($"{viewModel.EffectiveZoomPercent}%", zoomStatusText.Text);
+                Assert.Contains("화면 맞춤", Assert.IsType<string>(zoomStatusText.ToolTip), StringComparison.Ordinal);
                 Assert.True(previewImage.ActualWidth <= scrollViewer.ActualWidth + 1.0);
                 Assert.True(previewImage.ActualHeight <= scrollViewer.ActualHeight + 1.0);
                 Assert.Equal(0.0, scrollViewer.ScrollableWidth, precision: 1);

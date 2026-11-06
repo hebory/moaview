@@ -8,7 +8,7 @@
     <StartupObject>MoaView.Program</StartupObject>
     <AssemblyName>MoaView</AssemblyName>
     <RootNamespace>MoaView</RootNamespace>
-    <Version>0.1.2</Version>
+    <Version>0.1.4</Version>
     <Product>MoaView</Product>
     <Description>Windows file preview</Description>
     <ApplicationIcon>Assets\Brand\MoaView.ico</ApplicationIcon>
@@ -17,6 +17,7 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
     <PackageReference Include="Markdig" Version="1.5.1" />
     <Resource Include="Assets\Brand\MoaView.ico" />
+    <Resource Include="Assets\Brand\MoaView.png" />
     <Content Include="Assets\Rive\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\Licenses\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>

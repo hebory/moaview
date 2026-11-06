@@ -1,5 +1,5 @@
 param(
-    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '0.1.2',
+    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '0.1.4',
     [ValidatePattern('^8\.0\.\d+$')][string]$RuntimeVersion = '8.0.33',
     [string]$ExplorerIdentityDirectory,
     [switch]$SkipPublish

@@ -276,14 +276,15 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public bool IsMarkdownRendered => IsMarkdown && !ShowMarkdownSource;
     public Visibility MarkdownRenderedVisibility => IsMarkdownRendered ? Visibility.Visible : Visibility.Collapsed;
     public Visibility TextSourceVisibility => IsTextVisible && !IsMarkdownRendered ? Visibility.Visible : Visibility.Collapsed;
-    public Visibility DocumentSectionVisibility => IsTextVisible && !IsMarkdown ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility DocumentSectionVisibility => IsTextVisible && !IsMarkdown && DocumentSections.Count > 1
+        ? Visibility.Visible : Visibility.Collapsed;
     public string MarkdownContent => IsMarkdown ? TextContent : string.Empty;
     public IReadOnlyList<MarkdownThemeOption> MarkdownThemes => MarkdownThemeOption.All;
     public Brush TextBackground => (IsMarkdown ? SelectedMarkdownTheme : MarkdownThemeOption.All[0]).Background;
     public Brush TextForeground => (IsMarkdown ? SelectedMarkdownTheme : MarkdownThemeOption.All[0]).Foreground;
     public Brush TextBorderBrush => (IsMarkdown ? SelectedMarkdownTheme : MarkdownThemeOption.All[0]).Border;
     public string MarkdownSettingsMessage => _markdownSettingsMessage;
-    public Visibility MarkdownSettingsMessageVisibility => IsMarkdown && _markdownSettingsMessage.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility MarkdownSettingsMessageVisibility => _markdownSettingsMessage.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
 
     public MarkdownThemeOption SelectedMarkdownTheme
     {
@@ -357,6 +358,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public Visibility EmptyStateVisibility => IsEmptyState ? Visibility.Visible : Visibility.Collapsed;
 
     public Visibility ImageVisibility => IsImageVisible ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility OpenedFileVisibility => IsEmptyState ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility NavigationVisibility => CanNavigatePrevious || CanNavigateNext ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility ConversionToolsVisibility => CanConvertLoadedFormat ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility ViewerToolbarVisibility => IsImageVisible || CanNavigatePrevious || CanNavigateNext
+        ? Visibility.Visible : Visibility.Collapsed;
 
     public Visibility NoticeVisibility => IsNoticeVisible ? Visibility.Visible : Visibility.Collapsed;
 
@@ -462,6 +468,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public string SupportedFormatsDetail => SupportedFileFormats.SupportedFormatsDetailText;
 
+    public string CurrentFileNameDisplay => _currentResult.FileName ?? "선택된 파일 없음";
     public string CurrentFilePathDisplay => string.IsNullOrWhiteSpace(_currentResult.FilePath)
         ? "선택된 파일 없음"
         : _currentResult.FilePath! + (_currentResult.ArchiveEntryName is { } entry ? $" › {entry}" : "");

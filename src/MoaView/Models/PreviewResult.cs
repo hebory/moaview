@@ -29,8 +29,8 @@ public sealed record PreviewResult
     public static PreviewResult Empty() => new()
     {
         State = PreviewStateKind.Empty,
-        Title = "미리 볼 파일을 선택하세요",
-        Message = "상단의 '파일 선택...' 버튼을 누르거나 실행 인수로 파일 경로를 전달하면 미리보기를 표시합니다.",
+        Title = "파일을 열어보세요",
+        Message = "파일을 이 창에 끌어놓거나 아래 버튼을 누르세요.",
     };
 
     public static PreviewResult Image(

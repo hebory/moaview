@@ -48,6 +48,9 @@
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="ButtonBorder" Property="Background" Value="#4B5568" />
                             </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#A5B4FC" />
+                            </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="ButtonBorder" Property="Background" Value="#1E222A" />
                                 <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#2A2F3A" />
@@ -58,6 +61,26 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <Style x:Key="FlyoutCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="#242B37" />
+            <Setter Property="BorderBrush" Value="#495669" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="TextElement.Foreground" Value="#F3F4F6" />
+        </Style>
+        <Style x:Key="FlyoutHeadingStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+        <Style x:Key="FlyoutHelpStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#B3BECD" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,6,0,0" />
         </Style>
 
         <Style x:Key="FitModeButtonStyle"
@@ -121,6 +144,7 @@
                                           ClickMode="Press"
                                           IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
                                           Background="{TemplateBinding Background}"
+                                          Foreground="{TemplateBinding Foreground}"
                                           BorderBrush="{TemplateBinding BorderBrush}"
                                           BorderThickness="{TemplateBinding BorderThickness}">
                                 <ToggleButton.Template>
@@ -142,6 +166,7 @@
                                                                   VerticalAlignment="Center"
                                                                   Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                                   ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                                  ContentTemplateSelector="{Binding ItemTemplateSelector, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                                   ContentStringFormat="{Binding SelectionBoxItemStringFormat, RelativeSource={RelativeSource AncestorType=ComboBox}}" />
                                                 <Path Grid.Column="1"
                                                       Data="M 0 0 L 4 4 L 8 0 Z"
@@ -240,188 +265,129 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- 상단 헤더 툴바 -->
-        <Border Grid.Row="0"
-                Background="#21252B"
-                BorderBrush="#2F3540"
-                BorderThickness="0,0,0,1"
-                Padding="14,10">
+        <Border Grid.Row="0" Background="#20252F" BorderBrush="#343D4C" BorderThickness="0,0,0,1" Padding="16,10">
             <DockPanel LastChildFill="False">
+                <Button x:Name="SettingsButton" DockPanel.Dock="Right" Content="⚙  설정"
+                        Style="{StaticResource ViewerToolbarButtonStyle}" Padding="12,6"
+                        AutomationProperties.Name="설정" Click="OnSettingsClick"
+                        ToolTip="탐색기 연동, 마크다운 테마, 사용 안내" />
+                <TextBlock x:Name="ExplorerPreviewHint" DockPanel.Dock="Right" Text="Esc 또는 Space로 닫기"
+                           Foreground="#AAB4C3" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" Visibility="Collapsed" />
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
-                    <TextBlock Text="모아뷰"
-                               FontSize="16"
-                               FontWeight="SemiBold"
-                               Foreground="#FFFFFF"
-                               VerticalAlignment="Center"
-                               Margin="0,0,14,0" />
-                    <Button x:Name="OpenFileButton"
-                            Content="파일 선택..."
-                            Command="{Binding OpenFileCommand}"
-                            CommandParameter="{Binding ElementName=RootWindow}"
-                            Padding="12,5"
-                            Background="#3B82F6"
-                            Foreground="#FFFFFF"
-                            BorderThickness="0"
-                            FontWeight="SemiBold"
-                            Cursor="Hand"
-                            ToolTip="미리 볼 파일을 선택합니다 (Ctrl+O)" />
+                    <Image Source="Assets/Brand/MoaView.png" Width="28" Height="28" Margin="0,0,7,0" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <TextBlock Text="모아뷰" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,16,0" />
+                    <Button x:Name="OpenFileButton" Content="파일 열기" Style="{StaticResource ViewerToolbarButtonStyle}"
+                            Visibility="{Binding OpenedFileVisibility}"
+                            Command="{Binding OpenFileCommand}" CommandParameter="{Binding ElementName=RootWindow}"
+                            Padding="12,6" ToolTip="미리 볼 파일 열기 (Ctrl+O)" />
                 </StackPanel>
-
-                <CheckBox x:Name="ExplorerIntegrationToggle"
-                          DockPanel.Dock="Right"
-                          Content="탐색기 Space 꺼짐"
-                          Foreground="#D1D5DB"
-                          VerticalAlignment="Center"
-                          Margin="14,0,0,0"
-                          ToolTip="모아뷰 실행 중 탐색기에서 파일 하나를 선택하고 Space로 미리봅니다."
-                          Click="OnExplorerIntegrationToggleClick" />
-                <TextBlock x:Name="ExplorerPreviewHint"
-                           DockPanel.Dock="Right"
-                           Text="Space 또는 Esc로 닫기"
-                           Foreground="#93C5FD"
-                           VerticalAlignment="Center"
-                           Margin="14,0,0,0"
-                           Visibility="Collapsed" />
-                <TextBlock x:Name="SupportedFormatsBanner"
-                           DockPanel.Dock="Right"
-                           Text="{Binding SupportedFormatsSummary}"
-                           MaxWidth="300" TextTrimming="CharacterEllipsis" ToolTip="{Binding SupportedFormatsDetail}"
-                           Foreground="#9CA3AF"
-                           FontSize="12"
-                           VerticalAlignment="Center" />
             </DockPanel>
         </Border>
 
-        <!-- 이미지 보기 조작 툴바 -->
-        <Border x:Name="ViewerToolbar"
-                Grid.Row="1"
-                Background="#1B1E24"
-                BorderBrush="#2A2F3A"
-                BorderThickness="0,0,0,1"
-                Padding="14,6">
-            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <!-- 폴더 내 이전·다음 이동 -->
-                <Button x:Name="PreviousImageButton"
-                        Style="{StaticResource ViewerToolbarButtonStyle}"
-                        Content="◀ 이전"
-                        Command="{Binding PreviousImageCommand}"
-                        Margin="0,2,6,2"
-                        ToolTip="같은 폴더의 이전 이미지 (← / PageUp)" />
-                <TextBlock x:Name="FolderPositionText"
-                           Text="{Binding FolderPositionDisplay}"
-                           MinWidth="46"
-                           TextAlignment="Center"
-                           Foreground="#D1D5DB"
-                           FontSize="12"
-                           VerticalAlignment="Center"
-                           Margin="0,2,6,2" />
-                <Button x:Name="NextImageButton"
-                        Style="{StaticResource ViewerToolbarButtonStyle}"
-                        Content="다음 ▶"
-                        Command="{Binding NextImageCommand}"
-                        Margin="0,2,12,2"
-                        ToolTip="같은 폴더의 다음 이미지 (→ / PageDown)" />
+        <Popup x:Name="SettingsPopup" PlacementTarget="{Binding ElementName=SettingsButton}"
+               Placement="Custom" StaysOpen="False" AllowsTransparency="True">
+            <Border Style="{StaticResource FlyoutCardStyle}" Width="352" PreviewKeyDown="OnSettingsPreviewKeyDown"
+                    KeyboardNavigation.TabNavigation="Cycle">
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                        <Button x:Name="SettingsCloseButton" DockPanel.Dock="Right" Content="닫기" Style="{StaticResource ViewerToolbarButtonStyle}"
+                                Click="OnCloseSettingsClick" AutomationProperties.Name="설정 닫기" />
+                        <TextBlock Text="설정" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="350">
+                        <StackPanel Margin="0,0,6,0">
+                            <StackPanel x:Name="ExplorerSettingsGroup" Margin="0,0,0,16">
+                                <TextBlock Text="탐색기" Style="{StaticResource FlyoutHeadingStyle}" />
+                                <CheckBox x:Name="ExplorerIntegrationToggle" Content="Space 키로 미리보기" Foreground="#F3F4F6"
+                                          Click="OnExplorerIntegrationToggleClick" />
+                                <TextBlock x:Name="ExplorerIntegrationMessage" Style="{StaticResource FlyoutHelpStyle}"
+                                           Text="모아뷰가 켜져 있을 때 탐색기에서 파일 하나를 선택하고 Space를 누르세요." />
+                            </StackPanel>
+                            <TextBlock Text="마크다운" Style="{StaticResource FlyoutHeadingStyle}" />
+                            <DockPanel Margin="0,0,0,2" LastChildFill="False">
+                                <TextBlock Text="테마" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                <ComboBox x:Name="MarkdownThemePicker" Width="120" Style="{StaticResource DarkToolbarComboBoxStyle}"
+                                          ItemsSource="{Binding MarkdownThemes}" SelectedItem="{Binding SelectedMarkdownTheme, Mode=TwoWay}"
+                                          DisplayMemberPath="Name" AutomationProperties.Name="마크다운 미리보기 테마" />
+                            </DockPanel>
+                            <TextBlock Text="선택한 테마는 다음 실행에도 유지됩니다." Style="{StaticResource FlyoutHelpStyle}" />
+                            <TextBlock Text="{Binding MarkdownSettingsMessage}" Visibility="{Binding MarkdownSettingsMessageVisibility}"
+                                       Foreground="#FCD34D" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <Expander Header="지원 파일과 단축키" Foreground="#F3F4F6" Margin="0,16,0,0">
+                                <StackPanel Margin="14,0,0,0">
+                                    <TextBlock x:Name="SupportedFormatsBanner" Text="{Binding SupportedFormatsDetail}"
+                                               Style="{StaticResource FlyoutHelpStyle}" />
+                                    <TextBlock Text="Ctrl+O 파일 열기 · Ctrl+Shift+S 이미지 변환 · F 화면 맞춤"
+                                               Style="{StaticResource FlyoutHelpStyle}" />
+                                </StackPanel>
+                            </Expander>
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Popup>
 
-                <Rectangle Width="1"
-                           Height="18"
-                           Fill="#2F3540"
-                           VerticalAlignment="Center"
-                           Margin="0,2,12,2" />
-
-                <!-- 확대·축소 및 화면 맞춤 -->
-                <Button x:Name="ZoomOutButton"
-                        Style="{StaticResource ViewerToolbarButtonStyle}"
-                        Content="축소 -"
-                        Command="{Binding ZoomOutCommand}"
-                        Margin="0,2,6,2"
-                        ToolTip="축소 (- / Ctrl+-)" />
-                <TextBlock x:Name="ZoomStatusText"
-                           Text="{Binding ZoomDisplay}"
-                           MinWidth="84"
-                           TextAlignment="Center"
-                           Foreground="#E5E7EB"
-                           FontSize="12"
-                           FontWeight="Medium"
-                           VerticalAlignment="Center"
-                           Margin="0,2,6,2" />
-                <Button x:Name="ZoomInButton"
-                        Style="{StaticResource ViewerToolbarButtonStyle}"
-                        Content="확대 +"
-                        Command="{Binding ZoomInCommand}"
-                        Margin="0,2,6,2"
-                        ToolTip="확대 (+ / Ctrl++)" />
-                <Button x:Name="ActualSizeButton"
-                        Style="{StaticResource ViewerToolbarButtonStyle}"
-                        Content="100%"
-                        Command="{Binding ActualSizeCommand}"
-                        Margin="0,2,6,2"
-                        ToolTip="원본 픽셀 크기 100% (0 / Ctrl+0)" />
-                <Button x:Name="FitToWindowButton"
-                        Style="{StaticResource FitModeButtonStyle}"
-                        Content="화면 맞춤"
-                        Command="{Binding ToggleFitToWindowCommand}"
-                        Margin="0,2,12,2"
-                        ToolTip="창 크기에 맞춤 전환 (F / *)" />
-
-                <Rectangle Width="1"
-                           Height="18"
-                           Fill="#2F3540"
-                           VerticalAlignment="Center"
-                           Margin="0,2,12,2" />
-
-                <!-- 좌·우 90도 회전 -->
-                <Button x:Name="RotateLeftButton"
-                        Style="{StaticResource ViewerToolbarButtonStyle}"
-                        Content="↺ 좌회전"
-                        Command="{Binding RotateCounterClockwiseCommand}"
-                        Margin="0,2,6,2"
-                        ToolTip="반시계 방향 90° 회전 (L / Ctrl+Shift+R)" />
-                <Button x:Name="RotateRightButton"
-                        Style="{StaticResource ViewerToolbarButtonStyle}"
-                        Content="↻ 우회전"
-                        Command="{Binding RotateClockwiseCommand}"
-                        Margin="0,2,8,2"
-                        ToolTip="시계 방향 90° 회전 (R / Ctrl+R)" />
-                <TextBlock x:Name="RotationStatusText"
-                           Text="{Binding RotationDisplay}"
-                           MinWidth="32"
-                           Foreground="#9CA3AF"
-                           FontSize="12"
-                           VerticalAlignment="Center"
-                           Margin="0,2,12,2" />
-
-                <Rectangle Width="1"
-                           Height="18"
-                           Fill="#2F3540"
-                           VerticalAlignment="Center"
-                           Margin="0,2,12,2" />
-
-                <!-- 이미지 형식 변환 (JPEG, PNG, BMP) -->
-                <TextBlock Text="변환"
-                           Foreground="#9CA3AF"
-                           FontSize="12"
-                           VerticalAlignment="Center"
-                           Margin="0,2,6,2" />
-                <ComboBox x:Name="ConvertFormatComboBox"
-                          Style="{StaticResource DarkToolbarComboBoxStyle}"
-                          ItemsSource="{Binding AvailableConversionFormats}"
-                          SelectedItem="{Binding SelectedConversionFormatOption, Mode=TwoWay}"
-                          DisplayMemberPath="DisplayName"
-                          IsEnabled="{Binding CanExecuteConversion}"
-                          Focusable="False"
-                          MinWidth="104"
-                          Margin="0,2,6,2"
-                          ToolTip="변환 저장할 목표 이미지 형식 (JPEG, PNG, BMP)" />
-                <Button x:Name="ConvertImageButton"
-                        Style="{StaticResource ViewerToolbarButtonStyle}"
-                        Content="변환 저장..."
-                        Command="{Binding ConvertImageCommand}"
-                        CommandParameter="{Binding ElementName=RootWindow}"
-                        Margin="0,2,0,2"
-                        ToolTip="JPEG, PNG, BMP 형식으로 새 파일에 변환 저장합니다 (Ctrl+Shift+S)" />
+        <Border x:Name="ViewerToolbar" Grid.Row="1" Visibility="{Binding ViewerToolbarVisibility}"
+                Background="#1B2028" BorderBrush="#303844" BorderThickness="0,0,0,1" Padding="16,6">
+            <WrapPanel VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Margin="0,0,14,0" Visibility="{Binding NavigationVisibility}">
+                    <Button x:Name="PreviousImageButton" Content="‹ 이전" Style="{StaticResource ViewerToolbarButtonStyle}"
+                            Command="{Binding PreviousImageCommand}" ToolTip="이전 이미지 (← / PageUp)" />
+                    <TextBlock x:Name="FolderPositionText" Text="{Binding FolderPositionDisplay}" MinWidth="42"
+                               TextAlignment="Center" Foreground="#AAB4C3" FontSize="12" VerticalAlignment="Center" Margin="4,0" />
+                    <Button x:Name="NextImageButton" Content="다음 ›" Style="{StaticResource ViewerToolbarButtonStyle}"
+                            Command="{Binding NextImageCommand}" ToolTip="다음 이미지 (→ / PageDown)" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Visibility="{Binding ImageVisibility}">
+                    <Button x:Name="ZoomOutButton" Content="−" Style="{StaticResource ViewerToolbarButtonStyle}"
+                            Command="{Binding ZoomOutCommand}" AutomationProperties.Name="축소" ToolTip="축소 (- / Ctrl+-)" />
+                    <TextBlock x:Name="ZoomStatusText" Text="{Binding EffectiveZoomPercent, StringFormat={}{0}%}" ToolTip="{Binding ZoomDisplay}"
+                               MinWidth="48" TextAlignment="Center"
+                               Foreground="#E5E7EB" FontSize="12" VerticalAlignment="Center" Margin="6,0" />
+                    <Button x:Name="ZoomInButton" Content="+" Style="{StaticResource ViewerToolbarButtonStyle}"
+                            Command="{Binding ZoomInCommand}" AutomationProperties.Name="확대" ToolTip="확대 (+ / Ctrl++)" />
+                    <Button x:Name="FitToWindowButton" Content="화면 맞춤" Style="{StaticResource FitModeButtonStyle}"
+                            Command="{Binding ToggleFitToWindowCommand}" Margin="8,0,0,0" ToolTip="창 크기에 맞춤 (F)" />
+                    <Button x:Name="ImageOptionsButton" Content="더보기 ▾" Style="{StaticResource ViewerToolbarButtonStyle}"
+                            Margin="8,0,0,0" Click="OnImageOptionsClick" ToolTip="원본 크기, 회전, 변환 저장" />
+                </StackPanel>
             </WrapPanel>
         </Border>
 
+        <Popup x:Name="ImageOptionsPopup" PlacementTarget="{Binding ElementName=ImageOptionsButton}"
+               Placement="Custom" StaysOpen="False" AllowsTransparency="True">
+            <Border Style="{StaticResource FlyoutCardStyle}" Width="300" PreviewKeyDown="OnImageOptionsPreviewKeyDown"
+                    KeyboardNavigation.TabNavigation="Cycle">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,12">
+                        <Button x:Name="ImageOptionsCloseButton" DockPanel.Dock="Right" Content="닫기" Style="{StaticResource ViewerToolbarButtonStyle}"
+                                Click="OnCloseImageOptionsClick" AutomationProperties.Name="이미지 도구 닫기" />
+                        <TextBlock Text="이미지 도구" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <Button x:Name="ActualSizeButton" Content="원본 크기 (100%)" Style="{StaticResource ViewerToolbarButtonStyle}"
+                            Command="{Binding ActualSizeCommand}" HorizontalAlignment="Left" ToolTip="원본 픽셀 크기 (0)" />
+                    <WrapPanel Margin="0,8,0,0" VerticalAlignment="Center">
+                        <Button x:Name="RotateLeftButton" Content="왼쪽으로 회전" Style="{StaticResource ViewerToolbarButtonStyle}"
+                                Command="{Binding RotateCounterClockwiseCommand}" Margin="0,0,6,0" ToolTip="왼쪽으로 90° (L)" />
+                        <Button x:Name="RotateRightButton" Content="오른쪽으로 회전" Style="{StaticResource ViewerToolbarButtonStyle}"
+                                Command="{Binding RotateClockwiseCommand}" Margin="0,0,6,0" ToolTip="오른쪽으로 90° (R)" />
+                        <TextBlock x:Name="RotationStatusText" Text="{Binding RotationDisplay}" Foreground="#AAB4C3" VerticalAlignment="Center" />
+                    </WrapPanel>
+                    <StackPanel Visibility="{Binding ConversionToolsVisibility}" Margin="0,16,0,0">
+                        <TextBlock Text="다른 형식으로 저장" Style="{StaticResource FlyoutHeadingStyle}" />
+                        <WrapPanel>
+                            <ComboBox x:Name="ConvertFormatComboBox" Style="{StaticResource DarkToolbarComboBoxStyle}"
+                                      ItemsSource="{Binding AvailableConversionFormats}" SelectedItem="{Binding SelectedConversionFormatOption, Mode=TwoWay}"
+                                      DisplayMemberPath="DisplayName" IsEnabled="{Binding CanExecuteConversion}"
+                                      MinWidth="114" Margin="0,0,8,0" AutomationProperties.Name="저장할 이미지 형식" />
+                            <Button x:Name="ConvertImageButton" Content="변환 저장…" Style="{StaticResource ViewerToolbarButtonStyle}"
+                                    Command="{Binding ConvertImageCommand}" CommandParameter="{Binding ElementName=RootWindow}"
+                                    Click="OnCloseImageOptionsClick" ToolTip="변환 저장 (Ctrl+Shift+S)" />
+                        </WrapPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Popup>
         <!-- 이미지 변환 결과·오류·사전 안내 배너 -->
         <Border x:Name="ConversionNoticeBanner"
                 Grid.Row="2"
@@ -537,16 +503,9 @@
             <DockPanel x:Name="TextViewport" Grid.Column="1" Visibility="{Binding TextVisibility}" Margin="16">
                 <TextBlock DockPanel.Dock="Top" Text="{Binding ContentDescription}" Foreground="#93C5FD" Margin="0,0,0,10" TextWrapping="Wrap" />
                 <WrapPanel x:Name="MarkdownToolbar" DockPanel.Dock="Top" Visibility="{Binding MarkdownToolbarVisibility}" Margin="0,0,0,10">
-                    <TextBlock Text="테마" VerticalAlignment="Center" Margin="0,0,8,0" />
-                    <ComboBox x:Name="MarkdownThemePicker" Width="112" Margin="0,0,16,0"
-                              ItemsSource="{Binding MarkdownThemes}" SelectedItem="{Binding SelectedMarkdownTheme, Mode=TwoWay}"
-                              DisplayMemberPath="Name" Style="{StaticResource DarkToolbarComboBoxStyle}"
-                              AutomationProperties.Name="마크다운 미리보기 테마" />
                     <CheckBox x:Name="MarkdownSourceToggle" Content="원문 보기" IsChecked="{Binding ShowMarkdownSource}"
                               VerticalAlignment="Center" Foreground="#E5E7EB" />
                 </WrapPanel>
-                <TextBlock DockPanel.Dock="Top" Text="{Binding MarkdownSettingsMessage}" Visibility="{Binding MarkdownSettingsMessageVisibility}"
-                           Foreground="#FCD34D" TextWrapping="Wrap" Margin="0,0,0,10" />
                 <ComboBox x:Name="DocumentSectionPicker" DockPanel.Dock="Top" Margin="0,0,0,12"
                           Visibility="{Binding DocumentSectionVisibility}"
                           ItemsSource="{Binding DocumentSections}" SelectedItem="{Binding SelectedDocumentSection, Mode=TwoWay}"
@@ -566,33 +525,36 @@
             <Border x:Name="EmptyStatePanel"
                     Grid.Column="1"
                     Visibility="{Binding EmptyStateVisibility}"
-                    MaxWidth="560"
+                    Width="440"
+                    MaxWidth="440"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
-                    Background="#1F232A"
-                    BorderBrush="#2E3440"
+                    Background="#1C222D"
+                    BorderBrush="#394456"
                     BorderThickness="1"
-                    CornerRadius="8"
-                    Padding="28,24"
+                    CornerRadius="16"
+                    Padding="26,24"
                     Margin="24">
                 <StackPanel>
+                    <Image Source="Assets/Brand/MoaView.png" Width="56" Height="56" Margin="0,0,0,14"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
                     <TextBlock x:Name="EmptyStateTitle"
                                Text="{Binding StatusTitle}"
-                               FontSize="18"
+                               FontSize="23"
                                FontWeight="SemiBold"
                                Foreground="#F9FAFB"
-                               Margin="0,0,0,10" />
+                               TextAlignment="Center" Margin="0,0,0,8" />
                     <TextBlock x:Name="EmptyStateMessage"
                                Text="{Binding StatusMessage}"
                                FontSize="13.5"
                                Foreground="#D1D5DB"
-                               TextWrapping="Wrap"
-                               Margin="0,0,0,14" />
-                    <TextBlock x:Name="EmptyStateFormatsText"
-                               Text="{Binding SupportedFormatsDetail}"
-                               FontSize="12.5"
-                               Foreground="#93C5FD"
-                               TextWrapping="Wrap" />
+                               TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,18" />
+                    <Button x:Name="EmptyOpenFileButton" Content="파일 열기" Style="{StaticResource ViewerToolbarButtonStyle}"
+                            Command="{Binding OpenFileCommand}" CommandParameter="{Binding ElementName=RootWindow}"
+                            HorizontalAlignment="Center" Background="#435BE4" BorderBrush="#788BF6"
+                            FontSize="14" FontWeight="SemiBold" Padding="22,8" />
+                    <TextBlock Text="Ctrl+O로도 열 수 있어요" Foreground="#AAB4C3" FontSize="12"
+                               TextAlignment="Center" Margin="0,10,0,0" />
                 </StackPanel>
             </Border>
 
@@ -660,12 +622,6 @@
                                Text="{Binding StatusMessage}"
                                FontSize="13.5"
                                Foreground="#E5E7EB"
-                               TextWrapping="Wrap"
-                               Margin="0,0,0,14" />
-                    <TextBlock x:Name="NoticeSupportedFormatsText"
-                               Text="{Binding SupportedFormatsDetail}"
-                               FontSize="12.5"
-                               Foreground="#9CA3AF"
                                TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
@@ -673,6 +629,7 @@
 
         <!-- 하단 상태 표시줄 -->
         <Border Grid.Row="4"
+                Visibility="{Binding OpenedFileVisibility}"
                 Background="#21252B"
                 BorderBrush="#2F3540"
                 BorderThickness="0,1,0,0"
@@ -685,7 +642,7 @@
 
                 <TextBlock x:Name="CurrentFilePathText"
                            Grid.Column="0"
-                           Text="{Binding CurrentFilePathDisplay}"
+                           Text="{Binding CurrentFileNameDisplay}" ToolTip="{Binding CurrentFilePathDisplay}"
                            Foreground="#9CA3AF"
                            FontSize="12"
                            TextTrimming="CharacterEllipsis"
@@ -698,6 +655,7 @@
                            Foreground="#D1D5DB"
                            FontSize="12"
                            FontWeight="Medium"
+                           MaxWidth="300" TextTrimming="CharacterEllipsis" ToolTip="{Binding MetadataSummary}"
                            VerticalAlignment="Center" />
             </Grid>
         </Border>

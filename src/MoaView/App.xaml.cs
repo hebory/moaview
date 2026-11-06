@@ -90,7 +90,7 @@ public partial class App : Application
                 window.SetExplorerIntegrationState(false, message);
             };
             window.SetExplorerIntegrationState(true,
-                "모아뷰 실행 중 탐색기 파일 목록에서 파일 하나를 선택한 뒤 Space로 열고 닫습니다. 선택을 바꾸면 미리보기도 바뀝니다. 기본 창을 닫으면 연동도 종료됩니다.");
+                "모아뷰가 켜져 있을 때 탐색기에서 파일 하나를 선택하고 Space를 누르세요.");
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or UnauthorizedAccessException)
         {

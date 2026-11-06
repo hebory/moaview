@@ -1,6 +1,8 @@
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using MoaView.Models;
 using MoaView.ViewModels;
 using MoaView.Controls;
@@ -33,15 +35,18 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         InitializeComponent();
 
-        ExplorerIntegrationToggle.Visibility = isExplorerPreview ? Visibility.Collapsed : Visibility.Visible;
+        ExplorerSettingsGroup.Visibility = isExplorerPreview ? Visibility.Collapsed : Visibility.Visible;
         ExplorerPreviewHint.Visibility = isExplorerPreview ? Visibility.Visible : Visibility.Collapsed;
-        SupportedFormatsBanner.Visibility = isExplorerPreview ? Visibility.Collapsed : Visibility.Visible;
+        SettingsPopup.CustomPopupPlacementCallback = PlaceFlyout;
+        ImageOptionsPopup.CustomPopupPlacementCallback = PlaceFlyout;
 
         ViewModel.ViewResetRequested += OnViewModelViewResetRequested;
         ViewModel.PropertyChanged += OnPreviewContentChanged;
         Loaded += (_, _) => { SyncViewportSize(); UpdateRivePreview(); };
         Closed += (_, _) =>
         {
+            SettingsPopup.IsOpen = false;
+            ImageOptionsPopup.IsOpen = false;
             ViewModel.ViewResetRequested -= OnViewModelViewResetRequested;
             ViewModel.PropertyChanged -= OnPreviewContentChanged;
             _rivePreview?.Dispose();
@@ -54,7 +59,60 @@ public partial class MainWindow : Window
     public string RivePlaybackStatus => _rivePreview?.PlaybackStatus ?? "none";
     public Task<bool> WaitForRivePreviewAsync() => _rivePreview?.Ready ?? Task.FromResult(false);
 
-    private void OnPreviewContentChanged(object? sender, PropertyChangedEventArgs e) => UpdateRivePreview();
+    private void OnPreviewContentChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (!ViewModel.IsImageVisible) ImageOptionsPopup.IsOpen = false;
+        UpdateRivePreview();
+    }
+
+    private static CustomPopupPlacement[] PlaceFlyout(Size popup, Size anchor, Point _) =>
+    [
+        new(new Point(anchor.Width - popup.Width, anchor.Height + 6), PopupPrimaryAxis.Horizontal),
+        new(new Point(anchor.Width - popup.Width, -popup.Height - 6), PopupPrimaryAxis.Horizontal),
+    ];
+
+    private void OnSettingsClick(object sender, RoutedEventArgs e)
+    {
+        ImageOptionsPopup.IsOpen = false;
+        ShowFlyout(SettingsPopup, SettingsCloseButton);
+    }
+
+    private void OnImageOptionsClick(object sender, RoutedEventArgs e)
+    {
+        SettingsPopup.IsOpen = false;
+        ShowFlyout(ImageOptionsPopup, ImageOptionsCloseButton);
+    }
+
+    private void ShowFlyout(Popup popup, UIElement firstControl)
+    {
+        popup.IsOpen = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+        {
+            if (popup.IsOpen) firstControl.Focus();
+        }));
+    }
+
+    private static void CloseFlyout(Popup popup)
+    {
+        popup.IsOpen = false;
+        if (popup.PlacementTarget is { IsVisible: true } anchor) anchor.Focus();
+    }
+
+    private void OnCloseSettingsClick(object sender, RoutedEventArgs e) => CloseFlyout(SettingsPopup);
+    private void OnCloseImageOptionsClick(object sender, RoutedEventArgs e) => CloseFlyout(ImageOptionsPopup);
+
+    private void OnSettingsPreviewKeyDown(object sender, KeyEventArgs e) =>
+        HandleFlyoutEscape(SettingsPopup, MarkdownThemePicker.IsDropDownOpen, e);
+
+    private void OnImageOptionsPreviewKeyDown(object sender, KeyEventArgs e) =>
+        HandleFlyoutEscape(ImageOptionsPopup, ConvertFormatComboBox.IsDropDownOpen, e);
+
+    private static void HandleFlyoutEscape(Popup popup, bool dropDownOpen, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || dropDownOpen) return;
+        CloseFlyout(popup);
+        e.Handled = true;
+    }
 
     private void UpdateRivePreview()
     {
@@ -84,8 +142,7 @@ public partial class MainWindow : Window
     public void SetExplorerIntegrationState(bool enabled, string message)
     {
         ExplorerIntegrationToggle.IsChecked = enabled;
-        ExplorerIntegrationToggle.ToolTip = message;
-        ExplorerIntegrationToggle.Content = enabled ? "탐색기 Space 켜짐" : "탐색기 Space 꺼짐";
+        ExplorerIntegrationMessage.Text = message;
     }
 
     private void OnExplorerIntegrationToggleClick(object sender, RoutedEventArgs e) =>
@@ -122,6 +179,8 @@ public partial class MainWindow : Window
             PreviewStateKind.Empty =>
                 EmptyStatePanel.IsVisible &&
                 EmptyStateTitle.IsVisible &&
+                EmptyOpenFileButton.IsVisible &&
+                !ViewerToolbar.IsVisible &&
                 !ImageViewport.IsVisible &&
                 !NoticePanel.IsVisible &&
                 PreviewImage.Source is null,
@@ -266,12 +325,11 @@ public partial class MainWindow : Window
 
     private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (SettingsPopup.IsOpen || ImageOptionsPopup.IsOpen) return;
         var actualKey = e.Key == Key.System ? e.SystemKey : e.Key;
         if (MarkdownPreview.IsKeyboardFocusWithin && actualKey is not Key.Escape &&
             (Keyboard.Modifiers == ModifierKeys.None || Keyboard.Modifiers == ModifierKeys.Shift ||
                 Keyboard.Modifiers == ModifierKeys.Control && actualKey is Key.A or Key.C or Key.Home or Key.End))
-            return;
-        if (MarkdownThemePicker.IsKeyboardFocusWithin && actualKey is Key.Left or Key.Right or Key.Up or Key.Down or Key.Home or Key.End or Key.Space)
             return;
         if (MarkdownSourceToggle.IsKeyboardFocusWithin && actualKey == Key.Space) return;
         if (e.OriginalSource is System.Windows.Controls.TextBox && actualKey is not Key.Escape && Keyboard.Modifiers != ModifierKeys.Control)
