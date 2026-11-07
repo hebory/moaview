@@ -2,11 +2,27 @@
 
 모아뷰(MoaView)는 외부 미리보기 앱의 소스를 복제하거나 포크하지 않고 `.NET 8` / `WPF` 기반으로 자체 구현하는 독립 Windows 파일 미리보기 애플리케이션입니다.
 
+![MoaView 라이트 테마의 이미지 미리보기 화면](docs/images/light-preview.jpg)
+
+라이트 테마에서 커버 이미지를 연 실제 MoaView 0.1.7 화면입니다.
+
 WorkMesh 프로젝트 채널: `moaview`
 
 ## Windows 설치 파일
 
+[최신 Windows x64 설치 파일 다운로드](https://github.com/hebory/moaview/releases/latest)
+
 0.1.7 설치 파일의 출력 경로와 이름은 `artifacts/installer/MoaView-0.1.7-Setup-x64.exe`입니다. 빌드 명령은 `powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1 -Version 0.1.7`입니다. 설치 파일은 코드 서명이 없는 개발 배포본입니다. [설치 및 다시 빌드 안내](docs/install.md)
+
+## 런처용 이미지
+
+런처의 아이콘과 커버 경로에 아래 파일을 지정할 수 있습니다.
+
+| 용도 | 파일 | 규격 |
+| --- | --- | --- |
+| 런처 아이콘 | [icon.png](icon.png) | 512 × 512 · 투명 PNG |
+| 런처 커버 | [cover.png](cover.png) | 1672 × 941 · 가로형 PNG |
+| Windows 아이콘 | [MoaView.ico](src/MoaView/Assets/Brand/MoaView.ico) | 16~256 px · 다중 해상도 ICO |
 
 ## 미리보기와 탐색기 연동
 
