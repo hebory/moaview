@@ -7,24 +7,32 @@ using MoaView.ViewModels;
 
 namespace MoaView;
 
-public readonly record struct StartupOptions(string? InitialFilePath, bool VerifyStartupAndClose, bool PreviewOnly);
+public readonly record struct StartupOptions(string? InitialFilePath, bool VerifyStartupAndClose, bool PreviewOnly, bool Background = false);
 
 public partial class App : Application
 {
     public const string VerifyStartupSwitch = "--verify-startup";
     public const string PreviewSwitch = "--preview";
+    public const string BackgroundSwitch = "--background";
 
     private readonly IReadOnlyList<string> _startupArgs;
     private ExplorerPreviewIntegration? _explorerIntegration;
+    private readonly ResidentInstance? _residentInstance;
+    private WindowsStartupRegistration? _startupRegistration;
+    private TrayIcon? _trayIcon;
+    private MainWindow? _regularWindow;
+    private volatile bool _exiting;
+    private string _explorerMessage = "";
 
     public App()
         : this(Array.Empty<string>())
     {
     }
 
-    public App(IReadOnlyList<string> startupArgs)
+    public App(IReadOnlyList<string> startupArgs, ResidentInstance? residentInstance = null)
     {
         _startupArgs = startupArgs ?? Array.Empty<string>();
+        _residentInstance = residentInstance;
     }
 
     protected override void OnStartup(StartupEventArgs e)
@@ -40,6 +48,12 @@ public partial class App : Application
                 args.Handled = true;
                 Shutdown(3);
             };
+        }
+
+        if (!options.VerifyStartupAndClose && !options.PreviewOnly)
+        {
+            StartResident(options);
+            return;
         }
 
         var viewModel = new MainWindowViewModel();
@@ -62,21 +76,97 @@ public partial class App : Application
         {
             ScheduleStartupVerification(mainWindow);
         }
-        else if (!options.PreviewOnly)
-        {
-            mainWindow.ExplorerIntegrationToggleRequested += (_, _) =>
-                SetExplorerIntegration(mainWindow, mainWindow.IsExplorerIntegrationRequested);
-            SetExplorerIntegration(mainWindow, enabled: true);
-        }
     }
 
-    private void SetExplorerIntegration(MainWindow window, bool enabled)
+    private void StartResident(StartupOptions options)
+    {
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        _startupRegistration = new WindowsStartupRegistration();
+        _trayIcon = new TrayIcon(
+            () => Post(() => OpenMainWindow()),
+            () => Post(() => SetExplorerIntegration(_explorerIntegration is null)),
+            () => Post(ExitResident));
+        SetExplorerIntegration(enabled: true);
+        _residentInstance?.StartListening(request =>
+        {
+            if (_exiting || Dispatcher.HasShutdownStarted)
+                throw new InvalidOperationException("모아뷰가 종료 중입니다. 다시 실행해 주세요.");
+            Post(() =>
+            {
+                if (!request.Background || !string.IsNullOrWhiteSpace(request.FilePath))
+                    OpenMainWindow(request.FilePath);
+            });
+        });
+        if (!options.Background || !string.IsNullOrWhiteSpace(options.InitialFilePath))
+            OpenMainWindow(options.InitialFilePath);
+    }
+
+    private void Post(Action action)
+    {
+        if (!Dispatcher.HasShutdownStarted)
+            Dispatcher.BeginInvoke(new Action(() => { if (!_exiting) action(); }));
+    }
+
+    private void OpenMainWindow(string? filePath = null)
+    {
+        if (_regularWindow is null)
+        {
+            var window = new MainWindow(new MainWindowViewModel());
+            _regularWindow = window;
+            MainWindow = window;
+            window.ExplorerIntegrationToggleRequested += (_, _) =>
+                SetExplorerIntegration(window.IsExplorerIntegrationRequested);
+            window.SettingsOpened += (_, _) => RefreshStartupState();
+            window.WindowsStartupToggleRequested += (_, _) =>
+            {
+                _startupRegistration!.TrySetEnabled(window.IsWindowsStartupRequested, out var error);
+                RefreshStartupState(error);
+            };
+            window.Closed += (_, _) =>
+            {
+                // Closing releases media/WebView resources; the tray owns the app lifetime.
+                _regularWindow = null;
+                MainWindow = null;
+                if (!_exiting && !Dispatcher.HasShutdownStarted) _trayIcon?.ShowCloseHint();
+            };
+            window.SetExplorerIntegrationState(_explorerIntegration is not null, _explorerMessage);
+            RefreshStartupState();
+        }
+
+        if (!string.IsNullOrWhiteSpace(filePath)) _regularWindow.ViewModel.OpenFile(filePath);
+        _regularWindow.Show();
+        if (_regularWindow.WindowState == WindowState.Minimized) _regularWindow.WindowState = WindowState.Normal;
+        _regularWindow.Activate();
+    }
+
+    private void RefreshStartupState(string? error = null)
+    {
+        if (_startupRegistration is null || _regularWindow is null) return;
+        _startupRegistration.TryGetEnabled(out var enabled, out var readError);
+        _regularWindow.SetWindowsStartupState(enabled, error ?? readError);
+    }
+
+    private void ExitResident()
+    {
+        _exiting = true;
+        Shutdown();
+    }
+
+    private void UpdateExplorerState(string message)
+    {
+        _explorerMessage = message;
+        var enabled = _explorerIntegration is not null;
+        _regularWindow?.SetExplorerIntegrationState(enabled, message);
+        _trayIcon?.SetExplorerState(enabled);
+    }
+
+    private void SetExplorerIntegration(bool enabled)
     {
         _explorerIntegration?.Dispose();
         _explorerIntegration = null;
         if (!enabled)
         {
-            window.SetExplorerIntegrationState(false, "탐색기 Space 미리보기가 꺼져 있습니다. 클릭하면 다시 켭니다.");
+            UpdateExplorerState("탐색기 Space 미리보기가 꺼져 있습니다. 체크하면 다시 켭니다.");
             return;
         }
 
@@ -87,22 +177,34 @@ public partial class App : Application
             {
                 _explorerIntegration?.Dispose();
                 _explorerIntegration = null;
-                window.SetExplorerIntegrationState(false, message);
+                UpdateExplorerState(message);
+                _trayIcon?.ShowError(message);
             };
-            window.SetExplorerIntegrationState(true,
-                "모아뷰가 켜져 있을 때 탐색기에서 파일 하나를 선택하고 Space를 누르세요.");
+            UpdateExplorerState("창을 닫아도 트레이에서 실행됩니다. 탐색기에서 파일 하나를 선택하고 Space를 누르세요.");
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or UnauthorizedAccessException)
         {
-            window.SetExplorerIntegrationState(false, $"탐색기 연동을 시작하지 못했습니다. {ex.Message}");
+            var message = $"탐색기 연동을 시작하지 못했습니다. {ex.Message}";
+            UpdateExplorerState(message);
+            _trayIcon?.ShowError(message);
         }
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _exiting = true;
         _explorerIntegration?.Dispose();
         _explorerIntegration = null;
+        _trayIcon?.Dispose();
+        _trayIcon = null;
+        _residentInstance?.Dispose();
         base.OnExit(e);
+    }
+
+    protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+    {
+        _exiting = true;
+        base.OnSessionEnding(e);
     }
 
     public static StartupOptions ParseStartupOptions(
@@ -111,12 +213,13 @@ public partial class App : Application
     {
         var verifyStartup = false;
         var previewOnly = false;
+        var background = false;
         string? initialFilePath = null;
 
-        InspectArgs(constructorArgs, ref verifyStartup, ref previewOnly, ref initialFilePath);
-        InspectArgs(eventArgs, ref verifyStartup, ref previewOnly, ref initialFilePath);
+        InspectArgs(constructorArgs, ref verifyStartup, ref previewOnly, ref background, ref initialFilePath);
+        InspectArgs(eventArgs, ref verifyStartup, ref previewOnly, ref background, ref initialFilePath);
 
-        return new StartupOptions(initialFilePath, verifyStartup, previewOnly);
+        return new StartupOptions(initialFilePath, verifyStartup, previewOnly, background);
     }
 
     public static string? ResolveInitialFilePath(
@@ -128,6 +231,7 @@ public partial class App : Application
         IReadOnlyList<string>? args,
         ref bool verifyStartup,
         ref bool previewOnly,
+        ref bool background,
         ref string? initialFilePath)
     {
         if (args is null)
@@ -151,6 +255,12 @@ public partial class App : Application
             if (string.Equals(arg.Trim(), PreviewSwitch, StringComparison.OrdinalIgnoreCase))
             {
                 previewOnly = true;
+                continue;
+            }
+
+            if (string.Equals(arg.Trim(), BackgroundSwitch, StringComparison.OrdinalIgnoreCase))
+            {
+                background = true;
                 continue;
             }
 

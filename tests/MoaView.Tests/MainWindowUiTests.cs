@@ -258,6 +258,14 @@ public sealed class MainWindowUiTests
         Assert.True(shellPreview.VerifyStartupAndClose);
         Assert.Equal(shellFile, shellPreview.InitialFilePath);
         Assert.False(verifyWithFile.PreviewOnly);
+
+        var background = App.ParseStartupOptions([" --BACKGROUND "], []);
+        Assert.True(background.Background);
+        Assert.Null(background.InitialFilePath);
+        Assert.False(background.PreviewOnly);
+        Assert.False(background.VerifyStartupAndClose);
+        var backgroundWithFile = App.ParseStartupOptions([App.BackgroundSwitch, shellFile], []);
+        Assert.Equal(shellFile, backgroundWithFile.InitialFilePath);
     }
 
     [Fact]

@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <StartupObject>MoaView.Program</StartupObject>
     <AssemblyName>MoaView</AssemblyName>
     <RootNamespace>MoaView</RootNamespace>
@@ -16,6 +17,8 @@
     <ApplicationIcon>Assets\Brand\MoaView.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
     <PackageReference Include="Markdig" Version="1.5.1" />
     <PackageReference Include="SharpCompress" Version="0.50.8" />

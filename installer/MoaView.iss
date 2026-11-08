@@ -46,6 +46,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "startup"; Description: "{cm:StartAtLogin}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.pdb"
@@ -65,6 +66,9 @@ Root: HKCU; Subkey: "Software\Classes\*\shell\MoaView.Preview"; ValueType: strin
 Root: HKCU; Subkey: "Software\Classes\*\shell\MoaView.Preview"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\MoaView.exe"",0"
 Root: HKCU; Subkey: "Software\Classes\*\shell\MoaView.Preview"; ValueType: string; ValueName: "MultiSelectModel"; ValueData: "Single"
 Root: HKCU; Subkey: "Software\Classes\*\shell\MoaView.Preview\command"; ValueType: string; ValueData: """{app}\MoaView.exe"" --preview ""%1"""
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "MoaView"; ValueData: """{app}\MoaView.exe"" --background"; Flags: uninsdeletevalue; Tasks: startup
+; Retain an existing opt-in across upgrades and remove the app-managed value at uninstall, including entries enabled in Settings.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "MoaView"; Flags: uninsdeletevalue
 
 [Run]
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; Description: "{cm:InstallWebView2}"; Flags: postinstall skipifsilent waituntilterminated; Check: NeedsWebView2
@@ -78,6 +82,8 @@ Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoLogo -N
 [CustomMessages]
 korean.ExplorerPreview=MoaView로 미리보기
 english.ExplorerPreview=Preview with MoaView
+korean.StartAtLogin=Windows 로그인 시 MoaView 자동 실행
+english.StartAtLogin=Start MoaView when Windows starts
 korean.ExplorerIdentityFailed=Windows 11 기본 메뉴를 등록하지 못했습니다. 패키지 서명 인증서를 신뢰하는지 확인하세요. 지금은 추가 옵션 표시에서 미리보기를 사용할 수 있습니다.
 english.ExplorerIdentityFailed=The Windows 11 menu could not be registered. Check that Windows trusts the package signing certificate. Preview is available under Show more options.
 korean.InstallWebView2=이미지·Rive 미리보기용 Microsoft Edge WebView2 설치 (인터넷 필요)

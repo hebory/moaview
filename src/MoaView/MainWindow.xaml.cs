@@ -123,6 +123,7 @@ public partial class MainWindow : Window
 
     private void OnSettingsClick(object sender, RoutedEventArgs e)
     {
+        SettingsOpened?.Invoke(this, EventArgs.Empty);
         ImageOptionsPopup.IsOpen = false;
         ShowFlyout(SettingsPopup, SettingsCloseButton);
     }
@@ -209,6 +210,19 @@ public partial class MainWindow : Window
     }
 
     public event EventHandler? ExplorerIntegrationToggleRequested;
+    public event EventHandler? SettingsOpened;
+    public event EventHandler? WindowsStartupToggleRequested;
+
+    public bool IsWindowsStartupRequested => WindowsStartupToggle.IsChecked == true;
+
+    public void SetWindowsStartupState(bool enabled, string? error = null)
+    {
+        WindowsStartupToggle.IsChecked = enabled;
+        WindowsStartupMessage.Text = error ?? "로그인하면 창을 띄우지 않고 트레이에서 시작합니다.";
+    }
+
+    private void OnWindowsStartupToggleClick(object sender, RoutedEventArgs e) =>
+        WindowsStartupToggleRequested?.Invoke(this, EventArgs.Empty);
 
     public bool IsExplorerIntegrationRequested => ExplorerIntegrationToggle.IsChecked == true;
 
