@@ -12,7 +12,7 @@ WorkMesh 프로젝트 채널: `moaview`
 
 [최신 Windows x64 설치 파일 다운로드](https://github.com/hebory/moaview/releases/latest)
 
-0.1.7 설치 파일의 출력 경로와 이름은 `artifacts/installer/MoaView-0.1.7-Setup-x64.exe`입니다. 빌드 명령은 `powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1 -Version 0.1.7`입니다. 설치 파일은 코드 서명이 없는 개발 배포본입니다. [설치 및 다시 빌드 안내](docs/install.md)
+0.1.8 설치 파일의 출력 경로와 이름은 `artifacts/installer/MoaView-0.1.8-Setup-x64.exe`입니다. 빌드 명령은 `powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1 -Version 0.1.8`입니다. 설치 파일은 코드 서명이 없는 개발 배포본입니다. [설치 및 다시 빌드 안내](docs/install.md)
 
 ## 런처용 이미지
 
