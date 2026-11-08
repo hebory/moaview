@@ -91,7 +91,14 @@ public sealed class AppIcon : Control
         [AppIconKind.Play] = FilledPaths("M8 5.5a1 1 0 0 1 1.5-.86l10 6a1.6 1.6 0 0 1 0 2.72l-10 6A1 1 0 0 1 8 18.5Z"),
         [AppIconKind.Pause] = Paths("M7 5h3v14H7z", "M14 5h3v14h-3z"),
         [AppIconKind.Warning] = Paths("M10.3 4.3a2 2 0 0 1 3.4 0l7.7 13.4a2 2 0 0 1-1.7 3H4a2 2 0 0 1-1.7-3Z", "M12 9v4.5", "M12 17v.01"),
-        [AppIconKind.Image] = Paths("M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z", "M3 16l5-5 4 4 3-3 6 6", "M16.5 8a1.5 1.5 0 1 0 0 .01")
+        [AppIconKind.Image] = Paths("M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z", "M3 16l5-5 4 4 3-3 6 6", "M16.5 8a1.5 1.5 0 1 0 0 .01"),
+        [AppIconKind.Replay] = Paths("M4.5 9.5a8 8 0 1 1-.5 6", "M4 4.5v5h5"),
+        [AppIconKind.SeekBack] = Paths("M4.5 9.5a8.5 8.5 0 1 1-.5 6", "M4 4v5.5h5.5",
+            "M8 12.5l1.7-1.5v6.5", "M13 12.8a1.8 1.8 0 0 1 3.6 0v2.9a1.8 1.8 0 0 1-3.6 0Z"),
+        [AppIconKind.SeekForward] = Paths("M19.5 9.5a8.5 8.5 0 1 0 .5 6", "M20 4v5.5h-5.5",
+            "M8 12.5l1.7-1.5v6.5", "M13 12.8a1.8 1.8 0 0 1 3.6 0v2.9a1.8 1.8 0 0 1-3.6 0Z"),
+        [AppIconKind.Volume] = Paths("M3 9h4l5-4v14l-5-4H3Z", "M15.5 9a4 4 0 0 1 0 6", "M18 6a8 8 0 0 1 0 12"),
+        [AppIconKind.Muted] = Paths("M3 9h4l5-4v14l-5-4H3Z", "M15.5 9l6 6m0-6-6 6"),
     };
 
     private static IconGeometry[] Paths(params string[] geometries) => geometries.Select(path => Parse(path)).ToArray();
@@ -132,5 +139,10 @@ public enum AppIconKind
     Play,
     Pause,
     Warning,
-    Image
+    Image,
+    Replay,
+    SeekBack,
+    SeekForward,
+    Volume,
+    Muted
 }

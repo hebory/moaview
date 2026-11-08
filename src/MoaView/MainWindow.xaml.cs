@@ -304,6 +304,11 @@ public partial class MainWindow : Window
             return true;
         }
 
+        if (modifiers == ModifierKeys.None && _specializedPreview is LocalMediaPreviewControl media && media.HandleKeyInput(key))
+        {
+            return true;
+        }
+
         SyncViewportSize();
 
         if (modifiers == ModifierKeys.Control)
@@ -413,6 +418,18 @@ public partial class MainWindow : Window
             return;
         if (ViewModel.IsPurVisible && PurImageList.IsKeyboardFocusWithin && actualKey is Key.Left or Key.Right or Key.Up or Key.Down or Key.PageUp or Key.PageDown or Key.Home or Key.End)
             return;
+        if (Keyboard.Modifiers == ModifierKeys.None && _specializedPreview is LocalMediaPreviewControl media)
+        {
+            if (media.SpeedMenuIsOpen) return;
+            if (!(IsExplorerPreview && actualKey == Key.Space) &&
+                (media.KeepsControlKey(actualKey) || actualKey == Key.Space && e.OriginalSource is ButtonBase))
+                return;
+            if (e.IsRepeat && actualKey is Key.Space or Key.K or Key.M)
+            {
+                e.Handled = true;
+                return;
+            }
+        }
         if (IsExplorerPreview && e.IsRepeat && actualKey is Key.Space or Key.Escape)
         {
             e.Handled = true;

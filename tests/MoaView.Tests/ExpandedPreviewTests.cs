@@ -5,6 +5,8 @@ using System.Text;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Wpf;
@@ -201,15 +203,16 @@ public sealed class ExpandedPreviewTests
         var path = temp.GetPath("audio.wav");
         using (var writer = new BinaryWriter(File.Create(path)))
         {
-            const int samples = 8000;
+            const int sampleRate = 8000;
+            const int samples = sampleRate * 12;
             writer.Write("RIFF"u8);
             writer.Write(36 + samples);
             writer.Write("WAVEfmt "u8);
             writer.Write(16);
             writer.Write((ushort)1);
             writer.Write((ushort)1);
-            writer.Write(samples);
-            writer.Write(samples);
+            writer.Write(sampleRate);
+            writer.Write(sampleRate);
             writer.Write((ushort)1);
             writer.Write((ushort)8);
             writer.Write("data"u8);
@@ -221,17 +224,62 @@ public sealed class ExpandedPreviewTests
             window.ViewModel.OpenFile(path);
             Assert.Equal(SpecializedPreviewKind.Media, window.ViewModel.CurrentResult.SpecializedKind);
             Assert.True(Complete(window.WaitForSpecializedPreviewAsync()), Status(window));
-            var toolbar = Host(window).Children.OfType<DockPanel>().Single().Children.OfType<StackPanel>().Single();
-            var play = toolbar.Children.OfType<Button>().Single();
+            var host = Host(window);
+            var media = Descendants(host).OfType<MediaElement>().Single();
+            var play = FindControl<Button>("재생");
+            var mute = FindControl<Button>("음소거");
+            var position = FindControl<Slider>("재생 위치");
+            var volume = FindControl<Slider>("볼륨");
+            var speed = FindControl<ComboBox>("재생 속도");
+            var elapsed = FindControl<TextBlock>("현재 재생 시간");
+            var duration = FindControl<TextBlock>("전체 재생 시간");
             Assert.True(play.IsVisible);
-            Assert.Equal("재생", AutomationProperties.GetName(play));
             Assert.Equal(AppIconKind.Play, Assert.IsType<AppIcon>(play.Content).Kind);
+            Assert.Equal("00:00", elapsed.Text);
+            Assert.Equal("00:12", duration.Text);
+
+            position.RaiseEvent(new DragStartedEventArgs(0, 0) { RoutedEvent = Thumb.DragStartedEvent });
+            position.Value = 4;
+            Assert.Equal("00:04", elapsed.Text);
+            Assert.Equal(TimeSpan.Zero, media.Position);
+            position.RaiseEvent(new DragCompletedEventArgs(0, 0, false) { RoutedEvent = Thumb.DragCompletedEvent });
+            Assert.Equal(TimeSpan.FromSeconds(4), media.Position);
+
+            Assert.True(window.HandleKeyInput(Key.Right));
+            Assert.Equal(12, position.Value);
+            Assert.Equal(AppIconKind.Replay, Assert.IsType<AppIcon>(play.Content).Kind);
+            Assert.True(window.HandleKeyInput(Key.Left));
+            Assert.Equal(2, position.Value);
+            Assert.Equal(AppIconKind.Play, Assert.IsType<AppIcon>(play.Content).Kind);
+
+            Assert.True(window.HandleKeyInput(Key.M));
+            Assert.True(media.IsMuted);
+            Assert.Equal("음소거 해제", AutomationProperties.GetName(mute));
+            volume.Value = 0.6;
+            Assert.False(media.IsMuted);
+            Assert.Equal(0.6, media.Volume);
+            speed.SelectedItem = 1.5;
+            Assert.Equal(2, position.Value);
+
             play.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(1.5, media.SpeedRatio);
             Assert.Equal("일시 정지", AutomationProperties.GetName(play));
             Assert.Equal(AppIconKind.Pause, Assert.IsType<AppIcon>(play.Content).Kind);
-            play.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.True(window.HandleKeyInput(Key.Space));
             Assert.Equal("재생", AutomationProperties.GetName(play));
             Assert.Equal(AppIconKind.Play, Assert.IsType<AppIcon>(play.Content).Kind);
+
+            T FindControl<T>(string name) where T : DependencyObject =>
+                Descendants(host).OfType<T>().Single(control => AutomationProperties.GetName(control) == name);
+
+            static IEnumerable<DependencyObject> Descendants(DependencyObject root)
+            {
+                foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+                {
+                    yield return child;
+                    foreach (var descendant in Descendants(child)) yield return descendant;
+                }
+            }
         });
         File.Delete(path);
     }
