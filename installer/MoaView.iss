@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "0.1.8"
+  #define AppVersion "0.1.9"
 #endif
 #ifndef PublishDir
   #define PublishDir "..\artifacts\publish\win-x64"
@@ -86,8 +86,8 @@ korean.StartAtLogin=Windows 로그인 시 MoaView 자동 실행
 english.StartAtLogin=Start MoaView when Windows starts
 korean.ExplorerIdentityFailed=Windows 11 기본 메뉴를 등록하지 못했습니다. 패키지 서명 인증서를 신뢰하는지 확인하세요. 지금은 추가 옵션 표시에서 미리보기를 사용할 수 있습니다.
 english.ExplorerIdentityFailed=The Windows 11 menu could not be registered. Check that Windows trusts the package signing certificate. Preview is available under Show more options.
-korean.InstallWebView2=이미지·Rive 미리보기용 Microsoft Edge WebView2 설치 (인터넷 필요)
-english.InstallWebView2=Install Microsoft Edge WebView2 for image and Rive previews (internet required)
+korean.InstallWebView2=이미지·Rive·3D 미리보기용 Microsoft Edge WebView2 설치 (인터넷 필요)
+english.InstallWebView2=Install Microsoft Edge WebView2 for image, Rive and 3D previews (internet required)
 
 [Code]
 #ifdef ExplorerIdentityDir

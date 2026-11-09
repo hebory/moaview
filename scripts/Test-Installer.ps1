@@ -1,7 +1,7 @@
 param([string]$Installer)
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-if (!$Installer) { $Installer = Join-Path $repo 'artifacts/installer/MoaView-0.1.8-Setup-x64.exe' }
+if (!$Installer) { $Installer = Join-Path $repo 'artifacts/installer/MoaView-0.1.9-Setup-x64.exe' }
 $Installer = (Resolve-Path -LiteralPath $Installer).Path
 $registryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{23C80132-6E95-43B2-AD9B-A283239A5947}_is1'
 $menuKey = 'HKCU:\Software\Classes\*\shell\MoaView.Preview'
@@ -79,6 +79,9 @@ try {
     if ([IO.Path]::GetFullPath($registered).TrimEnd('\') -ne $target) { throw 'Unexpected registered installation location.' }
     foreach ($name in @('MoaView.exe','coreclr.dll','hostfxr.dll','PresentationFramework.dll','Microsoft.Windows.SDK.NET.dll','WinRT.Runtime.dll','SharpCompress.dll','Assets/Rive/vendor/rive.wasm','Assets/Rive/vendor/rive_fallback.wasm','Assets/Licenses/Markdig.txt','Assets/Licenses/WebView2-LICENSE.txt','Assets/Licenses/SharpCompress.txt')) {
         if (!(Test-Path -LiteralPath (Join-Path $target $name))) { throw "Installed payload missing: $name" }
+    }
+    foreach ($name in @('Assets/ThreeD/index.html','Assets/ThreeD/viewer.js','Assets/ThreeD/vendor/build/three.module.js','Assets/ThreeD/vendor/build/three.core.js','Assets/ThreeD/vendor/examples/jsm/loaders/FBXLoader.js','Assets/ThreeD/LICENSE','Assets/ThreeD/vendor/examples/jsm/libs/LICENSE-fflate.txt')) {
+        if (!(Test-Path -LiteralPath (Join-Path $target $name))) { throw "Installed 3D payload missing: $name" }
     }
     Assert-Startup 'Empty' '' 'Empty'
     $markdown = Join-Path $checkRoot 'preview sample & notes.md'
