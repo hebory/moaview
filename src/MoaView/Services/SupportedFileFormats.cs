@@ -74,6 +74,17 @@ public static class SupportedFileFormats
 
     public static IReadOnlyCollection<string> SupportedImageExtensions { get; } = Array.AsReadOnly(ExtensionMap.Keys.ToArray());
 
+    private static readonly HashSet<string> AudioExtensionMap = new(StringComparer.OrdinalIgnoreCase)
+    { ".mp3", ".wav", ".m4a", ".aac", ".flac", ".wma", ".ogg", ".opus", ".aiff" };
+
+    public static IReadOnlyCollection<string> SupportedAudioExtensions { get; } = Array.AsReadOnly(AudioExtensionMap.ToArray());
+
+    public static bool IsAudioExtension(string? extension) =>
+        !string.IsNullOrWhiteSpace(extension) && AudioExtensionMap.Contains(extension);
+
+    public static bool IsModel3DExtension(string? extension) => extension?.ToLowerInvariant() is
+        ".glb" or ".gltf" or ".fbx" or ".obj" or ".stl" or ".ply";
+
     public static IReadOnlyCollection<string> ConvertibleImageExtensions =>
         [".jpg", ".jpeg", ".png", ".bmp"];
 
@@ -92,10 +103,10 @@ public static class SupportedFileFormats
     ];
 
     public const string SupportedFormatsShortText =
-        "이미지 · 문서 · 오디오·동영상 · 압축 파일 · 글꼴 · 텍스트";
+        "이미지 · 문서 · 오디오·동영상 · 3D · 압축 파일 · 글꼴 · 텍스트";
 
     public const string SupportedFormatsDetailText =
-        "JPEG·JFIF, PNG·APNG, BMP, GIF, TIFF, SVG, WebP, AVIF, ICO, BPG, HEIC, PSD, DDS, JPEG XR·2000·XL, EXR, HDR, QOI, TGA, PCX, Netpbm, 카메라 RAW, CLIP · PDF·Office·HWP · 압축 · 오디오·동영상 · 글꼴 · RIV·PUR · 텍스트";
+        "JPEG·JFIF, PNG·APNG, BMP, GIF, TIFF, SVG, WebP, AVIF, ICO, BPG, HEIC, PSD, DDS, JPEG XR·2000·XL, EXR, HDR, QOI, TGA, PCX, Netpbm, 카메라 RAW, CLIP · PDF·Office·HWP · 압축 · 오디오·동영상 · GLB·GLTF·FBX·OBJ·STL·PLY · 글꼴 · RIV·PUR · 텍스트";
 
     public const string SupportedConversionShortText = "변환 지원: JPEG, PNG, BMP";
 

@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -14,7 +15,7 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
     private const double DefaultVolume = 0.35;
     private const int SkipSeconds = 10;
 
-    private readonly MediaElement _media = new()
+    private MediaElement _media = new()
     {
         LoadedBehavior = MediaState.Manual,
         UnloadedBehavior = MediaState.Close,
@@ -39,50 +40,80 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
     private readonly TextBlock _elapsed = CreateLabel("00:00", "현재 재생 시간");
     private readonly TextBlock _duration = CreateLabel("--:--", "전체 재생 시간");
     private readonly TextBlock _volumeLabel = CreateLabel("", "볼륨 수준");
-    private readonly TextBlock _audioLabel = new()
+    private readonly TextBlock _trackTitle = CreateLabel("", "곡 제목");
+    private readonly TextBlock _trackArtist = CreateLabel("", "아티스트와 앨범");
+    private readonly TextBlock _trackSummary = CreateLabel("", "곡 순서");
+    private readonly Button _previousTrack = CreateButton(AppIconKind.PreviousTrack, "이전 곡", "B");
+    private readonly Button _nextTrack = CreateButton(AppIconKind.NextTrack, "다음 곡", "N");
+    private readonly Button _stop = CreateButton(AppIconKind.Stop, "정지", "X");
+    private readonly Button _repeat = CreateButton(AppIconKind.Repeat, "반복 꺼짐", "R");
+    private readonly Button _shuffle = CreateButton(AppIconKind.Shuffle, "셔플 꺼짐", "S");
+    private readonly Button _playlistButton = CreateButton(AppIconKind.Playlist, "곡 목록 표시", "L");
+    private readonly ListBox _trackList = new()
     {
-        Text = "오디오 미리보기",
-        FontSize = 22,
-        VerticalAlignment = VerticalAlignment.Center,
-        HorizontalAlignment = HorizontalAlignment.Center,
+        DisplayMemberPath = nameof(TrackItem.Name),
+        SelectedValuePath = nameof(TrackItem.Path),
+        MaxHeight = 160,
+        BorderThickness = new Thickness(1),
         Visibility = Visibility.Collapsed,
+        Margin = new Thickness(0, 16, 0, 0),
     };
+    private readonly Grid _mediaArea = new();
+    private readonly FrameworkElement _audioPanel;
+    private readonly WrapPanel _musicActions = new() { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 8, 0, 0) };
+    private readonly CancellationTokenSource _lifetime = new();
+    private CancellationTokenSource? _metadataCancellation;
+    private AudioPlaylist? _playlist;
+    private TaskCompletionSource<bool> _trackReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private readonly Border _controller;
     private PlaybackState _state;
     private bool _scrubbing;
     private bool _updatingPosition;
+    private bool _updatingTrackSelection;
+    private bool _loadStarted;
+    private bool _playWhenOpened;
+    private int _trackGeneration;
+
+    internal string CurrentPath { get; private set; }
+    internal bool IsMusic { get; }
+    internal Task<bool> TrackReady => _trackReady.Task;
+    internal event EventHandler<string>? TrackChanged;
 
     public LocalMediaPreviewControl(string path)
     {
+        CurrentPath = path;
+        IsMusic = SupportedFileFormats.IsAudioExtension(Path.GetExtension(path));
         _controller = CreateController();
-        _audioLabel.SetResourceReference(TextBlock.ForegroundProperty, "AppTextBrush");
-
-        var mediaArea = new Grid();
-        mediaArea.Children.Add(_media);
-        mediaArea.Children.Add(_audioLabel);
+        _audioPanel = CreateAudioPanel();
+        _mediaArea.Children.Add(_media);
+        _mediaArea.Children.Add(_audioPanel);
         var layout = new DockPanel();
         DockPanel.SetDock(_controller, Dock.Bottom);
         layout.Children.Add(_controller);
-        layout.Children.Add(mediaArea);
+        layout.Children.Add(_mediaArea);
         Children.Add(layout);
 
         Loaded += Start;
-        _media.MediaOpened += (_, _) => OnMediaOpened();
-        _media.MediaFailed += (_, _) => FailPlayback();
-        _media.MediaEnded += (_, _) =>
-        {
-            if (_state != PlaybackState.Playing) return;
-            _media.Pause();
-            ChangeState(PlaybackState.Ended);
-            RefreshPosition();
-        };
         _timer.Tick += (_, _) => RefreshPosition();
 
         _play.Click += (_, _) => TogglePlayback();
         _back.Click += (_, _) => Skip(-SkipSeconds);
         _forward.Click += (_, _) => Skip(SkipSeconds);
         _mute.Click += (_, _) => ToggleMute();
+        _previousTrack.Click += (_, _) => MoveTrack(previous: true);
+        _nextTrack.Click += (_, _) => MoveTrack(previous: false);
+        _stop.Click += (_, _) => StopPlayback();
+        _repeat.Click += (_, _) => CycleRepeat();
+        _shuffle.Click += (_, _) => ToggleShuffle();
+        _playlistButton.Click += (_, _) => TogglePlaylist();
+        _trackList.SelectionChanged += (_, _) =>
+        {
+            if (_updatingTrackSelection || _playlist is null || _trackList.SelectedValue is not string selected ||
+                string.Equals(selected, CurrentPath, StringComparison.OrdinalIgnoreCase)) return;
+            var playing = _state == PlaybackState.Playing || _playWhenOpened;
+            if (_playlist.Select(selected)) LoadTrack(selected, playing, notifyHost: true);
+        };
         _volume.ValueChanged += (_, _) =>
         {
             _media.Volume = _volume.Value;
@@ -115,15 +146,8 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         {
             Loaded -= Start;
             if (IsDisposed) return;
-            try
-            {
-                _media.Source = new Uri(path, UriKind.Absolute);
-                _media.Pause();
-            }
-            catch (Exception ex) when (FilePreviewService.IsPreviewError(ex) || ex is UriFormatException)
-            {
-                FailPlayback();
-            }
+            LoadTrack(path, autoplay: false, notifyHost: false);
+            if (IsMusic) _ = LoadPlaylistAsync(path);
         }
     }
 
@@ -133,12 +157,19 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         Key.Left => Skip(-SkipSeconds),
         Key.Right => Skip(SkipSeconds),
         Key.M => ToggleMute(),
+        Key.N when IsMusic => MoveTrack(previous: false),
+        Key.B when IsMusic => MoveTrack(previous: true),
+        Key.X when IsMusic => StopPlayback(),
+        Key.R when IsMusic => CycleRepeat(),
+        Key.S when IsMusic => ToggleShuffle(),
+        Key.L when IsMusic => TogglePlaylist(),
         _ => false,
     };
 
     internal bool SpeedMenuIsOpen => _speed.IsDropDownOpen;
 
     internal bool KeepsControlKey(Key key) =>
+        (_trackList.IsKeyboardFocusWithin && key != Key.Escape) ||
         (key is Key.Left or Key.Right or Key.PageUp or Key.PageDown &&
             (_position.IsKeyboardFocusWithin || _volume.IsKeyboardFocusWithin)) ||
         (_speed.IsKeyboardFocusWithin && key is Key.Space or Key.Left or Key.Right or Key.PageUp or Key.PageDown);
@@ -187,6 +218,13 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         var controls = new StackPanel();
         controls.Children.Add(timeline);
         controls.Children.Add(actions);
+        foreach (var button in new[] { _previousTrack, _nextTrack, _stop, _repeat, _shuffle, _playlistButton })
+        {
+            button.Margin = new Thickness(3, 0, 3, 0);
+            _musicActions.Children.Add(button);
+        }
+        _musicActions.Visibility = IsMusic ? Visibility.Visible : Visibility.Collapsed;
+        controls.Children.Add(_musicActions);
         var controller = new Border
         {
             Child = controls,
@@ -199,6 +237,220 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         return controller;
     }
 
+    private FrameworkElement CreateAudioPanel()
+    {
+        var note = new AppIcon { Kind = AppIconKind.Music, Width = 56, Height = 56, Margin = new Thickness(0, 0, 0, 16) };
+        note.SetResourceReference(Control.ForegroundProperty, "AppAccentTextBrush");
+        _trackTitle.FontSize = 22;
+        _trackTitle.FontWeight = FontWeights.SemiBold;
+        _trackTitle.SetResourceReference(TextBlock.ForegroundProperty, "AppTextBrush");
+        foreach (var text in new[] { _trackTitle, _trackArtist, _trackSummary })
+        {
+            text.TextAlignment = TextAlignment.Center;
+            text.TextWrapping = TextWrapping.Wrap;
+            text.Margin = new Thickness(0, 3, 0, 3);
+        }
+        _trackTitle.Text = Path.GetFileNameWithoutExtension(CurrentPath);
+        _trackSummary.Text = IsMusic ? "같은 폴더의 음악을 찾고 있습니다." : "오디오 미리보기";
+        _trackList.SetResourceReference(Control.BackgroundProperty, "AppSurfaceBrush");
+        _trackList.SetResourceReference(Control.ForegroundProperty, "AppTextBrush");
+        _trackList.SetResourceReference(Control.BorderBrushProperty, "AppBorderBrush");
+        _trackList.SetResourceReference(ItemsControl.ItemContainerStyleProperty, "PreviewEntryStyle");
+        ScrollViewer.SetHorizontalScrollBarVisibility(_trackList, ScrollBarVisibility.Disabled);
+        VirtualizingPanel.SetIsVirtualizing(_trackList, true);
+        VirtualizingPanel.SetVirtualizationMode(_trackList, VirtualizationMode.Recycling);
+        AutomationProperties.SetName(_trackList, "같은 폴더의 음악");
+        var card = new StackPanel { MaxWidth = 640, Margin = new Thickness(24) };
+        card.Children.Add(note);
+        card.Children.Add(_trackTitle);
+        card.Children.Add(_trackArtist);
+        card.Children.Add(_trackSummary);
+        card.Children.Add(_trackList);
+        return new ScrollViewer
+        {
+            Content = card,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Visibility = IsMusic ? Visibility.Visible : Visibility.Collapsed,
+        };
+    }
+
+    private async Task LoadPlaylistAsync(string path)
+    {
+        try
+        {
+            var token = _lifetime.Token;
+            var playlist = await Task.Run(() => AudioPlaylist.FromFolder(path, token), token);
+            if (IsDisposed) return;
+            _playlist = playlist;
+            _updatingTrackSelection = true;
+            _trackList.ItemsSource = playlist.Tracks.Select(track => new TrackItem(track, Path.GetFileNameWithoutExtension(track))).ToArray();
+            _updatingTrackSelection = false;
+            UpdateMusicAppearance();
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task LoadTrackInfoAsync(string path, int generation, CancellationToken token)
+    {
+        try
+        {
+            var info = await AudioTrackInfoReader.ReadAsync(path, token);
+            if (IsDisposed || generation != _trackGeneration) return;
+            _trackTitle.Text = info.Title;
+            _trackArtist.Text = string.Join(" · ", new[] { info.Artist, info.Album }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private void LoadTrack(string path, bool autoplay, bool notifyHost)
+    {
+        if (IsDisposed) return;
+        if (_loadStarted)
+        {
+            _trackReady.TrySetResult(false);
+            _trackReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+        _loadStarted = true;
+        var muted = _media.IsMuted;
+        _timer.Stop();
+        _media.Close();
+        _media.Source = null;
+        _mediaArea.Children.Remove(_media);
+        var player = new MediaElement
+        {
+            LoadedBehavior = MediaState.Manual, UnloadedBehavior = MediaState.Close,
+            Stretch = Stretch.Uniform, Volume = _volume.Value, IsMuted = muted,
+        };
+        _media = player;
+        _mediaArea.Children.Insert(0, player);
+        // Ignore events queued by a previous native player after rapid track changes.
+        player.MediaOpened += (_, _) => { if (ReferenceEquals(player, _media)) OnMediaOpened(); };
+        player.MediaFailed += (_, _) => { if (ReferenceEquals(player, _media)) FailPlayback(); };
+        player.MediaEnded += (_, _) => { if (ReferenceEquals(player, _media)) OnMediaEnded(); };
+        CurrentPath = path;
+        _playWhenOpened = autoplay;
+        _scrubbing = false;
+        ChangeState(PlaybackState.Opening);
+        _play.IsEnabled = _back.IsEnabled = _forward.IsEnabled = _position.IsEnabled = false;
+        _stop.IsEnabled = IsMusic;
+        DisplayPosition(0);
+        _position.Maximum = 0;
+        _duration.Text = "--:--";
+        _trackTitle.Text = Path.GetFileNameWithoutExtension(path);
+        _trackTitle.ToolTip = path;
+        _trackArtist.Text = "";
+        UpdateMusicAppearance();
+        HideStatus();
+        var generation = ++_trackGeneration;
+        _metadataCancellation?.Cancel();
+        _metadataCancellation?.Dispose();
+        _metadataCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        if (IsMusic) _ = LoadTrackInfoAsync(path, generation, _metadataCancellation.Token);
+        if (notifyHost) TrackChanged?.Invoke(this, path);
+        if (IsDisposed) return;
+        try
+        {
+            player.Source = new Uri(path, UriKind.Absolute);
+            player.Pause();
+        }
+        catch (Exception ex) when (FilePreviewService.IsPreviewError(ex) || ex is UriFormatException)
+        {
+            FailPlayback();
+        }
+    }
+
+    private bool MoveTrack(bool previous)
+    {
+        if (!IsMusic || _playlist is null || IsDisposed) return false;
+        var playing = _state == PlaybackState.Playing || _playWhenOpened;
+        var path = previous ? _playlist.MovePrevious() : _playlist.MoveNext();
+        if (path is null) return false;
+        LoadTrack(path, playing, notifyHost: true);
+        return true;
+    }
+
+    private bool StopPlayback()
+    {
+        if (!IsMusic || IsDisposed) return false;
+        _playWhenOpened = false;
+        if (_state == PlaybackState.Opening) return true;
+        if (!IsReady) return false;
+        _media.Pause();
+        if (CanSeek) _media.Position = TimeSpan.Zero;
+        ChangeState(PlaybackState.Paused);
+        DisplayPosition(0);
+        return true;
+    }
+
+    private bool CycleRepeat()
+    {
+        if (_playlist is null || IsDisposed) return false;
+        _playlist.RepeatMode = _playlist.RepeatMode switch
+        {
+            RepeatMode.Off => RepeatMode.All, RepeatMode.All => RepeatMode.One, _ => RepeatMode.Off,
+        };
+        UpdateMusicAppearance();
+        return true;
+    }
+
+    private bool ToggleShuffle()
+    {
+        if (_playlist is null || IsDisposed) return false;
+        _playlist.Shuffle = !_playlist.Shuffle;
+        UpdateMusicAppearance();
+        return true;
+    }
+
+    private bool TogglePlaylist()
+    {
+        if (_playlist is null || IsDisposed) return false;
+        _trackList.Visibility = _trackList.IsVisible ? Visibility.Collapsed : Visibility.Visible;
+        UpdateMusicAppearance();
+        if (_trackList.IsVisible && _trackList.SelectedItem is { } item) _trackList.ScrollIntoView(item);
+        return true;
+    }
+
+    private void UpdateMusicAppearance()
+    {
+        _previousTrack.IsEnabled = _playlist?.CanMovePrevious == true;
+        _nextTrack.IsEnabled = _playlist?.CanMoveNext == true;
+        _repeat.IsEnabled = _shuffle.IsEnabled = _playlistButton.IsEnabled = _playlist is not null;
+        if (_playlist is null) return;
+        _trackSummary.Text = $"{Path.GetExtension(CurrentPath).TrimStart('.').ToUpperInvariant()} · {_playlist.CurrentIndex + 1} / {_playlist.Tracks.Count}곡";
+        _updatingTrackSelection = true;
+        _trackList.SelectedValue = CurrentPath;
+        _updatingTrackSelection = false;
+        var mode = _playlist.RepeatMode;
+        SetButtonAppearance(_repeat, mode == RepeatMode.One ? AppIconKind.RepeatOne : AppIconKind.Repeat,
+            mode switch { RepeatMode.All => "전체 반복", RepeatMode.One => "한 곡 반복", _ => "반복 꺼짐" }, "R");
+        SetButtonAppearance(_shuffle, AppIconKind.Shuffle, _playlist.Shuffle ? "셔플 켜짐" : "셔플 꺼짐", "S");
+        SetButtonAppearance(_playlistButton, AppIconKind.Playlist, _trackList.Visibility == Visibility.Visible ? "곡 목록 숨기기" : "곡 목록 표시", "L");
+        Highlight(_repeat, mode != RepeatMode.Off);
+        Highlight(_shuffle, _playlist.Shuffle);
+        Highlight(_playlistButton, _trackList.Visibility == Visibility.Visible);
+
+        static void Highlight(Button button, bool active)
+        {
+            button.SetResourceReference(Control.BackgroundProperty, active ? "AppAccentBrush" : "AppControlBrush");
+            button.SetResourceReference(Control.ForegroundProperty, active ? "AppOnAccentBrush" : "AppTextBrush");
+        }
+    }
+
+    private void OnMediaEnded()
+    {
+        if (_state != PlaybackState.Playing || IsDisposed) return;
+        _media.Pause();
+        if (IsMusic && _playlist?.MoveNext(automatic: true) is { } next)
+        {
+            LoadTrack(next, autoplay: true, notifyHost: true);
+            return;
+        }
+        ChangeState(PlaybackState.Ended);
+        RefreshPosition();
+    }
+
     private void OnMediaOpened()
     {
         if (_state != PlaybackState.Opening || IsDisposed) return;
@@ -208,7 +460,7 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         _position.Maximum = canSeek ? length.TimeSpan.TotalSeconds : 0;
         _duration.Text = canSeek ? FormatTime(_position.Maximum) : "--:--";
         var hasVideo = _media.HasVideo;
-        _audioLabel.Visibility = hasVideo ? Visibility.Collapsed : Visibility.Visible;
+        _audioPanel.Visibility = hasVideo ? Visibility.Collapsed : Visibility.Visible;
         if (hasVideo)
         {
             _media.ScrubbingEnabled = true;
@@ -216,9 +468,13 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         }
         _volume.IsEnabled = _mute.IsEnabled = _media.HasAudio;
         ChangeState(PlaybackState.Paused);
+        _play.IsEnabled = _stop.IsEnabled = true;
         RefreshPosition();
         _controller.Visibility = Visibility.Visible;
         ShowReady();
+        if (_playWhenOpened) TogglePlayback();
+        _playWhenOpened = false;
+        _trackReady.TrySetResult(true);
     }
 
     private bool TogglePlayback()
@@ -307,8 +563,16 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
     private void FailPlayback()
     {
         if (_state == PlaybackState.Closed || IsDisposed) return;
-        CloseMedia();
-        _controller.Visibility = _audioLabel.Visibility = Visibility.Collapsed;
+        _timer.Stop();
+        _playWhenOpened = false;
+        _media.Close();
+        _media.Source = null;
+        _state = PlaybackState.Failed;
+        _trackReady.TrySetResult(false);
+        _play.IsEnabled = _position.IsEnabled = _back.IsEnabled = _forward.IsEnabled = _stop.IsEnabled = false;
+        _controller.Visibility = IsMusic ? Visibility.Visible : Visibility.Collapsed;
+        _audioPanel.Visibility = Visibility.Collapsed;
+        UpdateMusicAppearance();
         ShowError("오디오·동영상을 열 수 없습니다. 파일이 손상되었거나 이 PC에 재생에 필요한 코덱이 없을 수 있습니다.");
     }
 
@@ -318,6 +582,11 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
     {
         if (_state == PlaybackState.Closed) return;
         _state = PlaybackState.Closed;
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+        _metadataCancellation?.Cancel();
+        _metadataCancellation?.Dispose();
+        _trackReady.TrySetResult(false);
         _timer.Stop();
         _media.Close();
         _media.Source = null;
@@ -371,5 +640,9 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         return label;
     }
 
-    private enum PlaybackState { Opening, Paused, Playing, Ended, Closed }
+    private sealed record TrackItem(string Path, string Name)
+    {
+        public override string ToString() => Name;
+    }
+    private enum PlaybackState { Opening, Paused, Playing, Ended, Failed, Closed }
 }

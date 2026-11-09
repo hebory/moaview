@@ -60,6 +60,26 @@ public sealed class ExplorerPreviewTests
     }
 
     [Fact]
+    public async Task Coordinator_DoesNotRestoreOriginalSelectionWhenPlaylistAdvancesInPreview()
+    {
+        const string explorerSelection = @"C:\music\track01.mp3";
+        const string nextTrack = @"C:\music\track02.mp3";
+        var selection = new SelectionStub { Path = explorerSelection };
+        var presenter = new PresenterStub();
+        using var coordinator = new ExplorerPreviewCoordinator(selection, presenter, () => FirstView);
+
+        await coordinator.ToggleAsync(FirstView);
+        Assert.Equal(explorerSelection, presenter.Path);
+
+        // The music player advances its MediaElement without another Shell selection change.
+        presenter.AdvanceTrack(nextTrack);
+        await coordinator.RefreshAsync();
+
+        Assert.Equal(nextTrack, presenter.Path);
+        Assert.Equal(1, presenter.ShowCount);
+    }
+
+    [Fact]
     public async Task Coordinator_EmptyOrMultipleSelectionDoesNotOpenAndClearsExistingPreview()
     {
         var selection = new SelectionStub();
@@ -295,6 +315,9 @@ public sealed class ExplorerPreviewTests
             Context = context;
             ShowCount++;
         }
+
+        public void AdvanceTrack(string path) => Path = path;
+
         public void Close() => IsOpen = false;
     }
 }

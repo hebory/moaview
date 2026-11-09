@@ -80,7 +80,9 @@ public partial class MainWindow : Window
     public bool IsExplorerPreview { get; }
     public string RivePlaybackStatus => _rivePreview?.PlaybackStatus ?? "none";
     public Task<bool> WaitForRivePreviewAsync() => _rivePreview?.Ready ?? Task.FromResult(false);
-    public Task<bool> WaitForSpecializedPreviewAsync() => _specializedPreview?.Ready ?? Task.FromResult(false);
+    public Task<bool> WaitForSpecializedPreviewAsync() => _specializedPreview is LocalMediaPreviewControl media
+        ? media.TrackReady
+        : _specializedPreview?.Ready ?? Task.FromResult(false);
 
     private void OnAppThemeSelected(object sender, SelectionChangedEventArgs e)
     {
@@ -106,6 +108,8 @@ public partial class MainWindow : Window
         var palette = AppPalette.For(_appearance.Theme);
         _rivePreview?.ApplyAppearance(palette.IsDark, palette.Preview, palette.Surface, palette.Text, palette.Muted, palette.Control, palette.Border);
         if (_specializedPreview is BrowserImagePreviewControl browser) browser.ApplyAppearance(palette.Preview);
+        if (_specializedPreview is Model3DPreviewControl model)
+            model.ApplyAppearance(palette.IsDark, palette.Preview, palette.Surface, palette.Text, palette.Muted, palette.Control, palette.Border);
     }
 
     private void OnPreviewContentChanged(object? sender, PropertyChangedEventArgs e)
@@ -191,6 +195,16 @@ public partial class MainWindow : Window
     {
         var result = ViewModel.IsSpecializedVisible ? ViewModel.CurrentResult : null;
         if (ReferenceEquals(_specializedResult, result)) return;
+        if (result?.SpecializedKind == SpecializedPreviewKind.Media &&
+            result.FilePath is { } mediaPath &&
+            _specializedPreview is LocalMediaPreviewControl currentMedia &&
+            string.Equals(currentMedia.CurrentPath, mediaPath, StringComparison.OrdinalIgnoreCase))
+        {
+            // The player already switched source; update file details without resetting its playlist or controls.
+            _specializedResult = result;
+            return;
+        }
+
         _specializedResult = result;
         _specializedPreview?.Dispose();
         SpecializedViewport.Children.Clear();
@@ -199,14 +213,26 @@ public partial class MainWindow : Window
             SpecializedPreviewKind.Pdf when result.SpecializedData is { } pdf => new PdfPreviewControl(pdf),
             SpecializedPreviewKind.Media when result.FilePath is { } media => new LocalMediaPreviewControl(media),
             SpecializedPreviewKind.Font when result.FilePath is { } font => new FontPreviewControl(font),
+            SpecializedPreviewKind.Model3D => new Model3DPreviewControl(result.FilePath,
+                result.ArchiveEntryName ?? result.FileName ?? "model.glb", result.SpecializedData),
             SpecializedPreviewKind.BrowserImage when result.SpecializedData is { } image &&
                 FilePreviewService.BrowserImageContentType(result.Extension ?? "") is { } mime => new BrowserImagePreviewControl(image, mime),
             _ => null,
         };
         if (_specializedPreview is BrowserImagePreviewControl browser)
             browser.CloseRequested += (_, _) => { if (IsExplorerPreview) Close(); };
+        if (_specializedPreview is LocalMediaPreviewControl localMedia)
+            localMedia.TrackChanged += OnMediaTrackChanged;
+        if (_specializedPreview is Model3DPreviewControl model)
+            model.CloseRequested += (_, _) => { if (IsExplorerPreview) Close(); };
         ApplyRendererAppearance();
         if (_specializedPreview is not null) SpecializedViewport.Children.Add(_specializedPreview);
+    }
+
+    private void OnMediaTrackChanged(object? sender, string path)
+    {
+        if (ReferenceEquals(sender, _specializedPreview))
+            ViewModel.OpenFile(path);
     }
 
     public event EventHandler? ExplorerIntegrationToggleRequested;
@@ -438,7 +464,9 @@ public partial class MainWindow : Window
             if (!(IsExplorerPreview && actualKey == Key.Space) &&
                 (media.KeepsControlKey(actualKey) || actualKey == Key.Space && e.OriginalSource is ButtonBase))
                 return;
-            if (e.IsRepeat && actualKey is Key.Space or Key.K or Key.M)
+            if (e.IsRepeat &&
+                (actualKey is Key.Space or Key.K or Key.M ||
+                 media.IsMusic && actualKey is Key.N or Key.B or Key.R or Key.S or Key.X or Key.L))
             {
                 e.Handled = true;
                 return;

@@ -99,6 +99,14 @@ public sealed class AppIcon : Control
             "M8 12.5l1.7-1.5v6.5", "M13 12.8a1.8 1.8 0 0 1 3.6 0v2.9a1.8 1.8 0 0 1-3.6 0Z"),
         [AppIconKind.Volume] = Paths("M3 9h4l5-4v14l-5-4H3Z", "M15.5 9a4 4 0 0 1 0 6", "M18 6a8 8 0 0 1 0 12"),
         [AppIconKind.Muted] = Paths("M3 9h4l5-4v14l-5-4H3Z", "M15.5 9l6 6m0-6-6 6"),
+        [AppIconKind.Music] = Paths("M9 18V5l11-2v13", "M9 8l11-2", "M9 18a3 2 0 1 1-6 0a3 2 0 1 1 6 0", "M20 16a3 2 0 1 1-6 0a3 2 0 1 1 6 0"),
+        [AppIconKind.PreviousTrack] = Paths("M5 5v14", "M19 5 8 12l11 7Z"),
+        [AppIconKind.NextTrack] = Paths("M19 5v14", "M5 5l11 7-11 7Z"),
+        [AppIconKind.Stop] = FilledPaths("M6 6h12v12H6Z"),
+        [AppIconKind.Repeat] = Paths("M4 10V8a3 3 0 0 1 3-3h13m-4-3 4 3-4 3", "M20 14v2a3 3 0 0 1-3 3H4m4 3-4-3 4-3"),
+        [AppIconKind.RepeatOne] = Paths("M4 10V8a3 3 0 0 1 3-3h13m-4-3 4 3-4 3", "M20 14v2a3 3 0 0 1-3 3H4m4 3-4-3 4-3", "M10 10l2-1v6m-2 0h4"),
+        [AppIconKind.Shuffle] = Paths("M3 6h3c5 0 7 12 12 12h3m-4-4 4 4-4 4", "M3 18h3c5 0 7-12 12-12h3m-4-4 4 4-4 4"),
+        [AppIconKind.Playlist] = Paths("M4 5h16M4 10h16M4 15h7M4 20h7", "M15 14l6 4-6 4Z"),
     };
 
     private static IconGeometry[] Paths(params string[] geometries) => geometries.Select(path => Parse(path)).ToArray();
@@ -144,5 +152,13 @@ public enum AppIconKind
     SeekBack,
     SeekForward,
     Volume,
-    Muted
+    Muted,
+    Music,
+    PreviousTrack,
+    NextTrack,
+    Stop,
+    Repeat,
+    RepeatOne,
+    Shuffle,
+    Playlist
 }

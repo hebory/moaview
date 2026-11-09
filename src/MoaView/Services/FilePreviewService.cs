@@ -14,8 +14,8 @@ public sealed class FilePreviewService : IPreviewService
     { ".txt", ".md", ".csv", ".tsv", ".log", ".json", ".xml", ".yaml", ".yml", ".ini", ".cs", ".js", ".ts", ".py", ".html", ".css" };
     public static bool IsDocumentExtension(string extension) => extension.ToLowerInvariant() is ".docx" or ".xlsx" or ".pptx" or ".hwp" or ".hwpx";
     private static bool IsMediaExtension(string extension) => extension is
-        ".mp4" or ".m4v" or ".mov" or ".mkv" or ".avi" or ".wmv" or ".webm" or ".mpeg" or ".mpg" or
-        ".mp3" or ".wav" or ".m4a" or ".aac" or ".flac" or ".wma" or ".ogg" or ".opus" or ".aiff";
+        ".mp4" or ".m4v" or ".mov" or ".mkv" or ".avi" or ".wmv" or ".webm" or ".mpeg" or ".mpg" ||
+        SupportedFileFormats.IsAudioExtension(extension);
 
     internal static string? BrowserImageContentType(string extension) => extension.ToLowerInvariant() switch
     {
@@ -40,6 +40,15 @@ public sealed class FilePreviewService : IPreviewService
             var extension = Path.GetExtension(path).ToLowerInvariant();
             if (Directory.Exists(path)) return FileDetailsPreviewReader.ReadDirectory(path);
             if (!File.Exists(path) || SupportedFileFormats.TryGetImageFormatByExtension(extension, out _)) return _images.Load(path);
+
+            if (SupportedFileFormats.IsModel3DExtension(extension))
+            {
+                var size = new FileInfo(path).Length;
+                if (size > Model3DResources.MaxFileBytes)
+                    throw new PreviewLimitException("3D 모델은 64 MB 이하의 파일을 미리볼 수 있습니다.");
+                return Specialized(Path.GetFileName(path), extension, size, SpecializedPreviewKind.Model3D,
+                    "3D 모델 · 드래그로 회전 · 휠로 확대·축소") with { FilePath = path };
+            }
 
             if (IsMediaExtension(extension) || extension is ".ttf" or ".otf")
             {
@@ -168,6 +177,7 @@ public sealed class FilePreviewService : IPreviewService
     {
         if (IsTextExtension(extension) || extension == ".svg") return PreviewLimits.MaxTextBytes;
         if (extension == ".riv") return 16 * 1024 * 1024;
+        if (SupportedFileFormats.IsModel3DExtension(extension)) return Model3DResources.MaxFileBytes;
         if (extension == ".pdf" || IsDocumentExtension(extension)) return PreviewLimits.MaxContainerBytes;
         if (BrowserImageContentType(extension) is not null || SupportedFileFormats.TryGetImageFormatByExtension(extension, out _))
             return PreviewLimits.MaxEntryBytes;
@@ -178,6 +188,9 @@ public sealed class FilePreviewService : IPreviewService
     {
         var extension = Path.GetExtension(name).ToLowerInvariant();
         if (SupportedFileFormats.TryGetImageFormatByExtension(extension, out _)) return _images.LoadBytes(bytes, name);
+        if (SupportedFileFormats.IsModel3DExtension(extension))
+            return Specialized(name, extension, bytes.LongLength, SpecializedPreviewKind.Model3D,
+                "3D 모델 · 압축 내부에서는 파일에 포함된 리소스만 표시", bytes);
         if (extension == ".pdf")
         {
             if (bytes.AsSpan(0, Math.Min(1024, bytes.Length)).IndexOf("%PDF-"u8) < 0)

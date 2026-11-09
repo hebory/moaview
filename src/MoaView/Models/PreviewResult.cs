@@ -87,4 +87,4 @@ public sealed record PreviewResult
     };
 }
 
-public enum SpecializedPreviewKind { Pdf, Media, BrowserImage, Font }
+public enum SpecializedPreviewKind { Pdf, Media, BrowserImage, Font, Model3D }

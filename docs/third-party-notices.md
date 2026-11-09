@@ -53,3 +53,12 @@ Clip Studio Paint는 공개 구조 조사에서 확인된 컨테이너와 캔버
 - [한컴 HWPX 패키지 구조](https://tech.hancom.com/python-hwpx-parsing-1/)
 
 문서 파서는 본 프로젝트의 구현이며 Office·한글 프로그램 또는 다른 미리보기 앱의 소스를 포함하지 않습니다.
+
+## three.js 3D 모델 렌더러
+
+- 패키지: [공식 npm `three` 0.187.0](https://www.npmjs.com/package/three/v/0.187.0), MIT License, Copyright © 2010-2026 three.js authors.
+- 취득: `npm pack three@0.187.0`, 2026-11-10. npm 패키지 tarball SHA-256: `ff540832ded0cfe919764d24a3d88f3e2a05f23303f876423e4f893841e90728`.
+- 포함 파일: `src/MoaView/Assets/ThreeD/vendor/build/three.module.js`, `three.core.js`와 선택한 `examples/jsm` 애드온·파서의 필요한 의존 파일만 포함합니다. [공식 three.js 저장소](https://github.com/mrdoob/three.js)에서 배포한 파일이며 [패키지의 전체 MIT 라이선스](../src/MoaView/Assets/ThreeD/LICENSE)를 앱 출력에도 복사해야 합니다.
+- 포함된 `fflate.module.js` **0.8.3**은 three.js의 FBX 압축 파서가 사용하는 라이브러리입니다. MIT License, Copyright © 2026 Arjun Barrett. [전체 라이선스](../src/MoaView/Assets/ThreeD/vendor/examples/jsm/libs/LICENSE-fflate.txt)는 앱 출력에도 복사해야 합니다. [공식 fflate 저장소](https://github.com/101arrowz/fflate).
+- 렌더러는 three.js `WebGLRenderer`, `OrbitControls`, `GLTFLoader`, `FBXLoader`, `OBJLoader`, `MTLLoader`, `STLLoader`, `PLYLoader`를 사용합니다. 모델은 선택적으로 재생하지 않는 한 애니메이션을 정지 상태로 표시합니다. Draco, KTX2, Meshopt 외부 디코더는 포함하지 않습니다.
+- 앱은 로컬 고정 자산으로만 실행하며 npm/CDN에서 코드를 가져오지 않습니다. three.js 버전을 바꿀 때 import된 애드온의 의존 파일과 양쪽 라이선스, 패키지 SHA-256을 함께 확인하세요.

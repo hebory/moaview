@@ -40,6 +40,8 @@ WorkMesh 프로젝트 채널: `moaview`
 - JPEG(JFIF 포함), PNG, BMP, GIF, TIFF와 PSD·PSB, DDS, JPEG XR·2000·XL, HEIC, EXR, HDR, QOI, TGA, PCX, Netpbm, 카메라 RAW, Clip Studio Paint의 저장된 캔버스 미리보기를 표시합니다.
 - SVG·WebP·AVIF·ICO·APNG·BPG와 애니메이션 GIF를 WebView2에서 표시합니다. [형식별 보기와 제한](docs/content-preview.md)
 - PDF 페이지와 TTF·OTF 글꼴 견본을 표시합니다. MP4·MOV·MKV·MP3·WAV·FLAC 등은 Windows에 설치된 코덱으로 재생합니다.
+- 음악은 같은 폴더의 곡 목록, 이전·다음 곡, 정지, 전체·한 곡 반복, 셔플과 제목·아티스트·앨범 표시를 지원합니다. 곡을 바꿔도 음량·음소거·배속이 유지됩니다.
+- 3D 모델(`GLB`, `GLTF`, `FBX`, `OBJ`, `STL`, `PLY`)을 회전·확대·이동하며 확인합니다. 화면 맞춤, 와이어프레임, 바닥 격자, 자동 회전과 포함 애니메이션 선택·재생을 제공합니다. 로컬 three.js와 WebView2를 사용하며 [형식별 제한](docs/content-preview.md)을 확인하세요.
 - ZIP·RAR·7Z·TAR·TAR.GZ와 CBZ·CBR·CB7을 열어 목록과 내부 항목을 확인합니다. EPUB·APK 등 ZIP 기반 패키지는 내부 목록으로 엽니다. 압축 해제는 메모리에서만 수행하며 솔리드 압축은 목록까지만 표시합니다.
 - 오피스·한글 내용 미리보기: `DOCX` 본문/표, `XLSX` 시트별 셀 주소/저장된 값/수식, `PPTX` 순서별 슬라이드 텍스트/표, `HWP 5.x` 본문과 표 안의 텍스트, `HWPX` 구역별 본문/표를 표시합니다. 구역·시트·슬라이드는 상단 선택 상자로 이동합니다. Office·한글 설치 없이 내용을 읽으며 원본 페이지 배치와 서식은 재현하지 않습니다.
 - Rive 애니메이션(`.riv`): 로컬 Rive Canvas 런타임으로 재생하며 아트보드·상태 머신·애니메이션 선택, 일시정지/재생, 처음부터 재생을 제공합니다. Microsoft Edge WebView2 Runtime이 필요합니다.
@@ -81,7 +83,7 @@ dotnet test
 
 빌드 후 `src\MoaView\bin\Debug\net8.0-windows10.0.19041.0\MoaView.exe`를 실행합니다. 현재 빌드는 .NET 8 Windows Desktop Runtime이 필요한 개발용 빌드입니다. 탐색기 연동은 설치·레지스트리 등록 없이 앱이 실행 중인 동안만 동작합니다.
 
-RIV와 웹 이미지·애니메이션을 표시하려면 Microsoft Edge WebView2 Runtime이 필요합니다. Rive와 BPG 디코더는 앱에 포함합니다. [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) · [외부 라이브러리와 라이선스](docs/third-party-notices.md)
+RIV·웹 이미지·애니메이션·3D 모델을 표시하려면 Microsoft Edge WebView2 Runtime이 필요합니다. Rive·BPG 디코더·three.js는 앱에 포함합니다. [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) · [외부 라이브러리와 라이선스](docs/third-party-notices.md)
 
 마크다운은 Markdig 1.5.1과 WPF로 표시하며 WebView2 Runtime이 필요하지 않습니다. 최초 빌드에 Markdig NuGet 패키지를 복원합니다.
 

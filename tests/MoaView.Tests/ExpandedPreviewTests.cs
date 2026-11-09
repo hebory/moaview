@@ -238,10 +238,11 @@ public sealed class ExpandedPreviewTests
             Assert.Equal("00:00", elapsed.Text);
             Assert.Equal("00:12", duration.Text);
 
+            var initialPosition = media.Position;
             position.RaiseEvent(new DragStartedEventArgs(0, 0) { RoutedEvent = Thumb.DragStartedEvent });
             position.Value = 4;
             Assert.Equal("00:04", elapsed.Text);
-            Assert.Equal(TimeSpan.Zero, media.Position);
+            Assert.Equal(initialPosition, media.Position);
             position.RaiseEvent(new DragCompletedEventArgs(0, 0, false) { RoutedEvent = Thumb.DragCompletedEvent });
             Assert.Equal(TimeSpan.FromSeconds(4), media.Position);
 
@@ -282,6 +283,116 @@ public sealed class ExpandedPreviewTests
             }
         });
         File.Delete(path);
+    }
+
+    [Fact]
+    public void MusicPlayer_KeepsPlaybackControlsAcrossTrackChangesAndSupportsRepeatAndStop()
+    {
+        using var temp = new TempTestDirectory();
+        var tracks = new[] { "01-first.wav", "02-second.wav", "03-last.wav" }
+            .Select(name => CreateSilentWav(temp.GetPath(name)))
+            .ToArray();
+
+        Preview(window =>
+        {
+            window.ViewModel.OpenFile(tracks[0]);
+            Assert.True(Complete(window.WaitForSpecializedPreviewAsync()), Status(window));
+            var host = Host(window);
+            var playlist = FindControl<ListBox>("같은 폴더의 음악");
+            Assert.True(Complete(WaitForPlaylist(playlist, tracks.Length)));
+            var next = FindControl<Button>("다음 곡");
+            var previous = FindControl<Button>("이전 곡");
+            var stop = FindControl<Button>("정지");
+            var repeat = FindControl<Button>("반복 꺼짐");
+            var play = FindControl<Button>("재생");
+            var volume = FindControl<Slider>("볼륨");
+            var speed = FindControl<ComboBox>("재생 속도");
+            var firstPlayer = Descendants(host).OfType<MediaElement>().Single();
+
+            volume.Value = 0.62;
+            speed.SelectedItem = 1.5;
+            play.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(1.5, firstPlayer.SpeedRatio);
+
+            next.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.True(Complete(window.WaitForSpecializedPreviewAsync()), Status(window));
+            Assert.Equal(tracks[1], window.ViewModel.CurrentResult.FilePath);
+            var secondPlayer = Descendants(host).OfType<MediaElement>().Single();
+            Assert.NotSame(firstPlayer, secondPlayer);
+            Assert.Equal(0.62, secondPlayer.Volume);
+            Assert.Equal(1.5, secondPlayer.SpeedRatio);
+            Assert.True(AutomationProperties.GetName(play) == "일시 정지");
+
+            // A completion callback queued by the detached source must not advance the new source.
+            firstPlayer.RaiseEvent(new RoutedEventArgs(MediaElement.MediaEndedEvent));
+            Assert.Equal(tracks[1], window.ViewModel.CurrentResult.FilePath);
+            secondPlayer.RaiseEvent(new RoutedEventArgs(MediaElement.MediaEndedEvent));
+            Assert.True(Complete(window.WaitForSpecializedPreviewAsync()), Status(window));
+            Assert.Equal(tracks[2], window.ViewModel.CurrentResult.FilePath);
+
+            stop.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var lastPlayer = Descendants(host).OfType<MediaElement>().Single();
+            Assert.Equal(TimeSpan.Zero, lastPlayer.Position);
+            Assert.Equal("재생", AutomationProperties.GetName(play));
+
+            repeat.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); // 전체 반복
+            Assert.Equal("전체 반복", AutomationProperties.GetName(repeat));
+            repeat.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); // 한 곡 반복
+            Assert.Equal("한 곡 반복", AutomationProperties.GetName(repeat));
+            play.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            lastPlayer.RaiseEvent(new RoutedEventArgs(MediaElement.MediaEndedEvent));
+            Assert.True(Complete(window.WaitForSpecializedPreviewAsync()), Status(window));
+            Assert.Equal(tracks[2], window.ViewModel.CurrentResult.FilePath);
+            Assert.NotSame(lastPlayer, Descendants(host).OfType<MediaElement>().Single());
+            Assert.Equal("일시 정지", AutomationProperties.GetName(play));
+
+            Task<bool> WaitForPlaylist(ListBox list, int count)
+            {
+                var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(20) };
+                timer.Tick += (_, _) =>
+                {
+                    if (list.Items.Count != count) return;
+                    timer.Stop();
+                    tcs.TrySetResult(true);
+                };
+                timer.Start();
+                return tcs.Task;
+            }
+
+            T FindControl<T>(string name) where T : DependencyObject =>
+                Descendants(host).OfType<T>().Single(control => AutomationProperties.GetName(control) == name);
+
+            static IEnumerable<DependencyObject> Descendants(DependencyObject root)
+            {
+                foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+                {
+                    yield return child;
+                    foreach (var descendant in Descendants(child)) yield return descendant;
+                }
+            }
+        });
+
+        static string CreateSilentWav(string path)
+        {
+            const int sampleRate = 8000;
+            const int samples = sampleRate * 12;
+            using var writer = new BinaryWriter(File.Create(path));
+            writer.Write("RIFF"u8);
+            writer.Write(36 + samples);
+            writer.Write("WAVEfmt "u8);
+            writer.Write(16);
+            writer.Write((ushort)1);
+            writer.Write((ushort)1);
+            writer.Write(sampleRate);
+            writer.Write(sampleRate);
+            writer.Write((ushort)1);
+            writer.Write((ushort)8);
+            writer.Write("data"u8);
+            writer.Write(samples);
+            writer.Write(Enumerable.Repeat((byte)128, samples).ToArray());
+            return path;
+        }
     }
 
     private static void Preview(Action<MainWindow> check, AppAppearance? appearance = null) => StaTestRunner.Run(() =>

@@ -26,6 +26,8 @@ internal abstract class SpecializedPreviewControl : Grid, IDisposable
     internal Task<bool> Ready => _ready.Task;
     protected bool IsDisposed { get; private set; }
 
+    protected void HideStatus() => _status.Visibility = Visibility.Collapsed;
+
     protected void ShowReady()
     {
         if (IsDisposed) return;
