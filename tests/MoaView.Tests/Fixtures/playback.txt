@@ -1,0 +1,7 @@
+playback.mp4 is a synthetic moving test pattern, with a silent AAC track.
+It is a 6-second, 160x90 H.264 derivative of the project's generated
+artifacts/media-controller-check/MoaView-Playback.mp4 test pattern.
+No third-party footage, music or personal data is included.
+
+Recreate from that generated test clip:
+ffmpeg -y -i MoaView-Playback.mp4 -t 6 -vf scale=160:90 -r 10 -c:v libx264 -pix_fmt yuv420p -g 10 -c:a copy -movflags +faststart playback.mp4

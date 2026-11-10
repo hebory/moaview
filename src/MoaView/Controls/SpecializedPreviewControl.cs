@@ -28,6 +28,13 @@ internal abstract class SpecializedPreviewControl : Grid, IDisposable
 
     protected void HideStatus() => _status.Visibility = Visibility.Collapsed;
 
+    protected void ShowLoading(string message)
+    {
+        if (IsDisposed) return;
+        _status.Text = message;
+        _status.Visibility = Visibility.Visible;
+    }
+
     protected void ShowReady()
     {
         if (IsDisposed) return;

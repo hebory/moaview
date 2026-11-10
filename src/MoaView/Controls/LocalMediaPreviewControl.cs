@@ -66,6 +66,7 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
     private AudioPlaylist? _playlist;
     private TaskCompletionSource<bool> _trackReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(200) };
+    private readonly DispatcherTimer _openingTimeout = new() { Interval = TimeSpan.FromSeconds(15) };
     private readonly Border _controller;
     private PlaybackState _state;
     private bool _scrubbing;
@@ -73,6 +74,9 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
     private bool _updatingTrackSelection;
     private bool _loadStarted;
     private bool _playWhenOpened;
+    private bool _preparingVideo;
+    private int _videoRenderPasses;
+    private TimeSpan? _lastVideoRenderTime;
     private int _trackGeneration;
 
     internal string CurrentPath { get; private set; }
@@ -96,6 +100,7 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
 
         Loaded += Start;
         _timer.Tick += (_, _) => RefreshPosition();
+        _openingTimeout.Tick += (_, _) => FailPlayback("미디어 준비 시간이 초과되었습니다. 파일을 다시 열거나 다른 플레이어에서 재생해 주세요.");
 
         _play.Click += (_, _) => TogglePlayback();
         _back.Click += (_, _) => Skip(-SkipSeconds);
@@ -146,7 +151,7 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         {
             Loaded -= Start;
             if (IsDisposed) return;
-            LoadTrack(path, autoplay: false, notifyHost: false);
+            LoadTrack(path, autoplay: !IsMusic, notifyHost: false);
             if (IsMusic) _ = LoadPlaylistAsync(path);
         }
     }
@@ -314,6 +319,7 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         }
         _loadStarted = true;
         var muted = _media.IsMuted;
+        StopPreparingVideo();
         _timer.Stop();
         _media.Close();
         _media.Source = null;
@@ -322,6 +328,8 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         {
             LoadedBehavior = MediaState.Manual, UnloadedBehavior = MediaState.Close,
             Stretch = Stretch.Uniform, Volume = _volume.Value, IsMuted = muted,
+            // Enable preroll before opening, so a paused video can present its first frame.
+            ScrubbingEnabled = !IsMusic,
         };
         _media = player;
         _mediaArea.Children.Insert(0, player);
@@ -329,6 +337,16 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         player.MediaOpened += (_, _) => { if (ReferenceEquals(player, _media)) OnMediaOpened(); };
         player.MediaFailed += (_, _) => { if (ReferenceEquals(player, _media)) FailPlayback(); };
         player.MediaEnded += (_, _) => { if (ReferenceEquals(player, _media)) OnMediaEnded(); };
+        player.BufferingStarted += (_, _) =>
+        {
+            if (!ReferenceEquals(player, _media) || IsDisposed || _state is PlaybackState.Failed or PlaybackState.Closed) return;
+            _videoRenderPasses = 0;
+            ShowLoading("재생할 내용을 불러오고 있습니다…");
+        };
+        player.BufferingEnded += (_, _) =>
+        {
+            if (ReferenceEquals(player, _media) && IsReady) HideStatus();
+        };
         CurrentPath = path;
         _playWhenOpened = autoplay;
         _scrubbing = false;
@@ -342,7 +360,8 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         _trackTitle.ToolTip = path;
         _trackArtist.Text = "";
         UpdateMusicAppearance();
-        HideStatus();
+        ShowLoading(IsMusic ? "음악을 준비하고 있습니다…" : "동영상을 준비하고 있습니다…");
+        _openingTimeout.Start();
         var generation = ++_trackGeneration;
         _metadataCancellation?.Cancel();
         _metadataCancellation?.Dispose();
@@ -453,24 +472,66 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
 
     private void OnMediaOpened()
     {
-        if (_state != PlaybackState.Opening || IsDisposed) return;
+        if (_state != PlaybackState.Opening || _preparingVideo || IsDisposed) return;
         var length = _media.NaturalDuration;
         var canSeek = length.HasTimeSpan && length.TimeSpan > TimeSpan.Zero;
         _position.IsEnabled = _back.IsEnabled = _forward.IsEnabled = canSeek;
         _position.Maximum = canSeek ? length.TimeSpan.TotalSeconds : 0;
         _duration.Text = canSeek ? FormatTime(_position.Maximum) : "--:--";
         var hasVideo = _media.HasVideo;
-        _audioPanel.Visibility = hasVideo ? Visibility.Collapsed : Visibility.Visible;
-        if (hasVideo)
+        // A video container with an unsupported video codec may open its audio stream only.
+        if (!IsMusic && (!hasVideo || _media.NaturalVideoWidth <= 0 || _media.NaturalVideoHeight <= 0))
         {
-            _media.ScrubbingEnabled = true;
-            _media.Position = TimeSpan.Zero;
+            FailPlayback("영상 트랙을 읽을 수 없습니다. 이 PC에 영상 코덱이 없거나 파일이 손상되었을 수 있습니다. 다른 플레이어에서 확인해 주세요.");
+            return;
         }
+        _audioPanel.Visibility = hasVideo ? Visibility.Collapsed : Visibility.Visible;
         _volume.IsEnabled = _mute.IsEnabled = _media.HasAudio;
+        _controller.Visibility = Visibility.Visible;
+        if (!IsMusic)
+        {
+            // MediaOpened reports metadata, not a completed layout/render. Keep preroll paused
+            // until the visible video surface has participated in composition without buffering.
+            _preparingVideo = true;
+            _videoRenderPasses = 0;
+            CompositionTarget.Rendering += OnVideoRendering;
+            return;
+        }
+        CompleteOpening();
+    }
+
+    private void OnVideoRendering(object? sender, EventArgs e)
+    {
+        if (!_preparingVideo || IsDisposed || _state != PlaybackState.Opening) return;
+        if (e is RenderingEventArgs render)
+        {
+            if (_lastVideoRenderTime == render.RenderingTime) return;
+            _lastVideoRenderTime = render.RenderingTime;
+        }
+        if (!_media.IsLoaded || !_media.IsVisible || _media.ActualWidth <= 0 || _media.ActualHeight <= 0 || _media.IsBuffering)
+        {
+            _videoRenderPasses = 0;
+            return;
+        }
+        if (++_videoRenderPasses < 2) return;
+        CompleteOpening();
+    }
+
+    private void StopPreparingVideo()
+    {
+        CompositionTarget.Rendering -= OnVideoRendering;
+        _preparingVideo = false;
+        _videoRenderPasses = 0;
+        _lastVideoRenderTime = null;
+        _openingTimeout.Stop();
+    }
+
+    private void CompleteOpening()
+    {
+        StopPreparingVideo();
         ChangeState(PlaybackState.Paused);
         _play.IsEnabled = _stop.IsEnabled = true;
         RefreshPosition();
-        _controller.Visibility = Visibility.Visible;
         ShowReady();
         if (_playWhenOpened) TogglePlayback();
         _playWhenOpened = false;
@@ -560,9 +621,10 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
             _media.IsMuted ? "음소거 해제" : "음소거", "M");
     }
 
-    private void FailPlayback()
+    private void FailPlayback(string? message = null)
     {
         if (_state == PlaybackState.Closed || IsDisposed) return;
+        StopPreparingVideo();
         _timer.Stop();
         _playWhenOpened = false;
         _media.Close();
@@ -573,7 +635,7 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         _controller.Visibility = IsMusic ? Visibility.Visible : Visibility.Collapsed;
         _audioPanel.Visibility = Visibility.Collapsed;
         UpdateMusicAppearance();
-        ShowError("오디오·동영상을 열 수 없습니다. 파일이 손상되었거나 이 PC에 재생에 필요한 코덱이 없을 수 있습니다.");
+        ShowError(message ?? "오디오·동영상을 열 수 없습니다. 파일이 손상되었거나 이 PC에 재생에 필요한 코덱이 없을 수 있습니다.");
     }
 
     protected override void ReleaseResources() => CloseMedia();
@@ -581,6 +643,7 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
     private void CloseMedia()
     {
         if (_state == PlaybackState.Closed) return;
+        StopPreparingVideo();
         _state = PlaybackState.Closed;
         _lifetime.Cancel();
         _lifetime.Dispose();
