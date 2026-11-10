@@ -15,13 +15,7 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
     private const double DefaultVolume = 0.35;
     private const int SkipSeconds = 10;
 
-    private MediaElement _media = new()
-    {
-        LoadedBehavior = MediaState.Manual,
-        UnloadedBehavior = MediaState.Close,
-        Stretch = Stretch.Uniform,
-        Volume = DefaultVolume,
-    };
+    private IMediaPlayback _media = new WpfAudioPlayback { Volume = DefaultVolume };
     private readonly Button _play = CreateButton(AppIconKind.Play, "재생", "K", primary: true);
     private readonly Button _back = CreateButton(AppIconKind.SeekBack, "10초 뒤로", "←");
     private readonly Button _forward = CreateButton(AppIconKind.SeekForward, "10초 앞으로", "→");
@@ -74,14 +68,12 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
     private bool _updatingTrackSelection;
     private bool _loadStarted;
     private bool _playWhenOpened;
-    private bool _preparingVideo;
-    private int _videoRenderPasses;
-    private TimeSpan? _lastVideoRenderTime;
     private int _trackGeneration;
 
     internal string CurrentPath { get; private set; }
     internal bool IsMusic { get; }
     internal Task<bool> TrackReady => _trackReady.Task;
+    internal IMediaPlayback Playback => _media;
     internal event EventHandler<string>? TrackChanged;
 
     public LocalMediaPreviewControl(string path)
@@ -90,7 +82,7 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         IsMusic = SupportedFileFormats.IsAudioExtension(Path.GetExtension(path));
         _controller = CreateController();
         _audioPanel = CreateAudioPanel();
-        _mediaArea.Children.Add(_media);
+        _mediaArea.Children.Add(_media.View);
         _mediaArea.Children.Add(_audioPanel);
         var layout = new DockPanel();
         DockPanel.SetDock(_controller, Dock.Bottom);
@@ -319,28 +311,22 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         }
         _loadStarted = true;
         var muted = _media.IsMuted;
-        StopPreparingVideo();
+        _openingTimeout.Stop();
         _timer.Stop();
-        _media.Close();
-        _media.Source = null;
-        _mediaArea.Children.Remove(_media);
-        var player = new MediaElement
-        {
-            LoadedBehavior = MediaState.Manual, UnloadedBehavior = MediaState.Close,
-            Stretch = Stretch.Uniform, Volume = _volume.Value, IsMuted = muted,
-            // Enable preroll before opening, so a paused video can present its first frame.
-            ScrubbingEnabled = !IsMusic,
-        };
+        _media.Dispose();
+        _mediaArea.Children.Remove(_media.View);
+        IMediaPlayback player = IsMusic ? new WpfAudioPlayback() : new VideoFramePlayback();
+        player.Volume = _volume.Value;
+        player.IsMuted = muted;
         _media = player;
-        _mediaArea.Children.Insert(0, player);
+        _mediaArea.Children.Insert(0, player.View);
         // Ignore events queued by a previous native player after rapid track changes.
-        player.MediaOpened += (_, _) => { if (ReferenceEquals(player, _media)) OnMediaOpened(); };
-        player.MediaFailed += (_, _) => { if (ReferenceEquals(player, _media)) FailPlayback(); };
-        player.MediaEnded += (_, _) => { if (ReferenceEquals(player, _media)) OnMediaEnded(); };
+        player.Opened += (_, _) => { if (ReferenceEquals(player, _media)) OnMediaOpened(); };
+        player.Failed += (_, _) => { if (ReferenceEquals(player, _media)) FailPlayback((player as VideoFramePlayback)?.ErrorMessage); };
+        player.Ended += (_, _) => { if (ReferenceEquals(player, _media)) OnMediaEnded(); };
         player.BufferingStarted += (_, _) =>
         {
             if (!ReferenceEquals(player, _media) || IsDisposed || _state is PlaybackState.Failed or PlaybackState.Closed) return;
-            _videoRenderPasses = 0;
             ShowLoading("재생할 내용을 불러오고 있습니다…");
         };
         player.BufferingEnded += (_, _) =>
@@ -472,7 +458,7 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
 
     private void OnMediaOpened()
     {
-        if (_state != PlaybackState.Opening || _preparingVideo || IsDisposed) return;
+        if (_state != PlaybackState.Opening || IsDisposed) return;
         var length = _media.NaturalDuration;
         var canSeek = length.HasTimeSpan && length.TimeSpan > TimeSpan.Zero;
         _position.IsEnabled = _back.IsEnabled = _forward.IsEnabled = canSeek;
@@ -488,47 +474,13 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         _audioPanel.Visibility = hasVideo ? Visibility.Collapsed : Visibility.Visible;
         _volume.IsEnabled = _mute.IsEnabled = _media.HasAudio;
         _controller.Visibility = Visibility.Visible;
-        if (!IsMusic)
-        {
-            // MediaOpened reports metadata, not a completed layout/render. Keep preroll paused
-            // until the visible video surface has participated in composition without buffering.
-            _preparingVideo = true;
-            _videoRenderPasses = 0;
-            CompositionTarget.Rendering += OnVideoRendering;
-            return;
-        }
+        // The video backend raises Opened only after decoded pixels reach the WPF image.
         CompleteOpening();
-    }
-
-    private void OnVideoRendering(object? sender, EventArgs e)
-    {
-        if (!_preparingVideo || IsDisposed || _state != PlaybackState.Opening) return;
-        if (e is RenderingEventArgs render)
-        {
-            if (_lastVideoRenderTime == render.RenderingTime) return;
-            _lastVideoRenderTime = render.RenderingTime;
-        }
-        if (!_media.IsLoaded || !_media.IsVisible || _media.ActualWidth <= 0 || _media.ActualHeight <= 0 || _media.IsBuffering)
-        {
-            _videoRenderPasses = 0;
-            return;
-        }
-        if (++_videoRenderPasses < 2) return;
-        CompleteOpening();
-    }
-
-    private void StopPreparingVideo()
-    {
-        CompositionTarget.Rendering -= OnVideoRendering;
-        _preparingVideo = false;
-        _videoRenderPasses = 0;
-        _lastVideoRenderTime = null;
-        _openingTimeout.Stop();
     }
 
     private void CompleteOpening()
     {
-        StopPreparingVideo();
+        _openingTimeout.Stop();
         ChangeState(PlaybackState.Paused);
         _play.IsEnabled = _stop.IsEnabled = true;
         RefreshPosition();
@@ -624,7 +576,7 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
     private void FailPlayback(string? message = null)
     {
         if (_state == PlaybackState.Closed || IsDisposed) return;
-        StopPreparingVideo();
+        _openingTimeout.Stop();
         _timer.Stop();
         _playWhenOpened = false;
         _media.Close();
@@ -643,7 +595,7 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
     private void CloseMedia()
     {
         if (_state == PlaybackState.Closed) return;
-        StopPreparingVideo();
+        _openingTimeout.Stop();
         _state = PlaybackState.Closed;
         _lifetime.Cancel();
         _lifetime.Dispose();
@@ -651,8 +603,7 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         _metadataCancellation?.Dispose();
         _trackReady.TrySetResult(false);
         _timer.Stop();
-        _media.Close();
-        _media.Source = null;
+        _media.Dispose();
     }
 
     private static string FormatTime(double seconds)
