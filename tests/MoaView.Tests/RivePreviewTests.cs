@@ -44,11 +44,11 @@ public sealed class RivePreviewTests
                     hasPixels = Complete(web.ExecuteScriptAsync("(() => { const c=document.getElementById('canvas'); return c.getContext('2d').getImageData(0,0,c.width,c.height).data.some(value=>value!==0); })()"));
                 Assert.Equal("true", hasPixels);
                 Assert.Equal("true", Complete(web.ExecuteScriptAsync("document.getElementById('artboard').options.length > 0")));
-                Assert.Equal("\"재생\"", Complete(web.ExecuteScriptAsync("document.getElementById('pause').click(); document.getElementById('pause').textContent")));
+                Assert.Equal("\"재생\"", Complete(web.ExecuteScriptAsync("document.getElementById('pause').click(); document.getElementById('pause').getAttribute('aria-label')")));
                 appearance.Select(AppTheme.Light);
                 Complete(WaitForLightTheme());
                 Assert.Same(load, window.WaitForRivePreviewAsync());
-                Assert.Equal("\"재생\"", Complete(web.ExecuteScriptAsync("document.getElementById('pause').textContent")));
+                Assert.Equal("\"재생\"", Complete(web.ExecuteScriptAsync("document.getElementById('pause').getAttribute('aria-label')")));
                 Assert.False(model.CanExecuteConversion);
                 model.OpenFile(fixture);
                 Assert.True(Complete(window.WaitForRivePreviewAsync()));

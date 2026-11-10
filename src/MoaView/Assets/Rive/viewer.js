@@ -3,7 +3,6 @@ const canvas = document.getElementById("canvas");
 const artboard = document.getElementById("artboard");
 const animation = document.getElementById("animation");
 const pause = document.getElementById("pause");
-const pauseLabel = document.getElementById("pause-label");
 const restart = document.getElementById("restart");
 const status = document.getElementById("status");
 let player = null;
@@ -37,7 +36,9 @@ function playSelection() {
   updatePlaybackButton();
 }
 function updatePlaybackButton() {
-  pauseLabel.textContent = paused ? "재생" : "일시정지";
+  const label = paused ? "재생" : "일시정지";
+  pause.setAttribute("aria-label", label);
+  pause.title = label;
   pause.classList.toggle("paused", paused);
 }
 function playbackOptions() {

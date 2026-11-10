@@ -56,7 +56,7 @@ public partial class MainWindow : Window
         ShowThemeSaveMessage();
 
         ExplorerSettingsGroup.Visibility = isExplorerPreview ? Visibility.Collapsed : Visibility.Visible;
-        ExplorerPreviewHint.Visibility = isExplorerPreview ? Visibility.Visible : Visibility.Collapsed;
+        ExplorerPreviewCloseButton.Visibility = isExplorerPreview ? Visibility.Visible : Visibility.Collapsed;
         SettingsPopup.CustomPopupPlacementCallback = PlaceFlyout;
         ImageOptionsPopup.CustomPopupPlacementCallback = PlaceFlyout;
 
@@ -152,6 +152,8 @@ public partial class MainWindow : Window
         popup.IsOpen = false;
         if (popup.PlacementTarget is { IsVisible: true } anchor) anchor.Focus();
     }
+
+    private void OnClosePreviewClick(object sender, RoutedEventArgs e) => Close();
 
     private void OnCloseSettingsClick(object sender, RoutedEventArgs e) => CloseFlyout(SettingsPopup);
     private void OnCloseImageOptionsClick(object sender, RoutedEventArgs e) => CloseFlyout(ImageOptionsPopup);

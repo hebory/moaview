@@ -12,7 +12,7 @@ WorkMesh 프로젝트 채널: `moaview`
 
 [최신 Windows x64 설치 파일 다운로드](https://github.com/hebory/moaview/releases/latest)
 
-0.1.10 설치 파일의 출력 경로와 이름은 `artifacts/installer/MoaView-0.1.10-Setup-x64.exe`입니다. 빌드 명령은 `powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1 -Version 0.1.10`입니다. 설치 파일은 코드 서명이 없는 개발 배포본입니다. [설치 및 다시 빌드 안내](docs/install.md)
+0.1.11 설치 파일의 출력 경로와 이름은 `artifacts/installer/MoaView-0.1.11-Setup-x64.exe`입니다. 빌드 명령은 `powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1 -Version 0.1.11`입니다. 설치 파일은 코드 서명이 없는 개발 배포본입니다. [설치 및 다시 빌드 안내](docs/install.md)
 
 ## 런처용 이미지
 
@@ -29,6 +29,7 @@ WorkMesh 프로젝트 채널: `moaview`
 - 독립 솔루션(`MoaView.sln`), Windows WPF 실행 앱(`src/MoaView`), xUnit 기능 테스트(`tests/MoaView.Tests`) 구성
 - 필요한 NuGet 패키지가 캐시에 있으면 오프라인 복원 가능하며, 단일 노드/노드 비재사용 빌드 설정으로 제한된 환경의 빌드를 지원합니다.
 - 시작 화면의 **파일 열기**(`Ctrl+O`) 버튼이나 파일 끌어놓기로 미리봅니다. 실행 인수로 파일 경로도 전달할 수 있습니다.
+- 미리보기 상단 메뉴는 폴더·설정 등의 간단한 아이콘으로 표시합니다. 마크다운 원문 전환, 3D·Rive 도구도 같은 방식이며, 마우스를 올리면 기능 이름을 확인할 수 있습니다.
 - **설정**에서 앱 테마, 탐색기 연동, 마크다운 읽기 테마, 지원 형식과 단축키 안내를 확인합니다. 앱 테마는 **다크·라이트·세피아·오션·포레스트** 5가지이며 현재 사용자 설정으로 저장됩니다. 마크다운 읽기 테마는 앱 테마와 별도로 선택·저장합니다.
 - 이미지가 열리면 확대·축소, 폴더 이전·다음, 화면 맞춤, 이미지 도구 아이콘이 표시됩니다. 아이콘 버튼은 키보드로 이동·실행할 수 있고, 포인터를 올리면 동작과 단축키가 보이며 보조 기술에는 접근 가능한 이름을 제공합니다. 이미지 도구에서 원본 크기·회전·변환 저장을 사용할 수 있습니다.
 - 탐색기 Space 미리보기(C2): 모아뷰가 실행 중이면 탐색기 파일 목록에서 항목 하나를 선택하고 `Space`로 별도 미리보기 창을 열고 닫습니다. 탐색기 포커스를 유지하며, 같은 창에서 선택한 항목이 바뀌면 미리보기를 갱신합니다.

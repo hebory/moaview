@@ -71,6 +71,42 @@
             <Setter Property="Padding" Value="0" />
         </Style>
 
+        <Style x:Key="IconToolbarToggleStyle" TargetType="CheckBox">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border x:Name="ToggleBorder" CornerRadius="8" BorderThickness="1"
+                                Background="{DynamicResource AppControlBrush}" BorderBrush="{DynamicResource AppBorderBrush}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ToggleBorder" Property="Background" Value="{DynamicResource AppHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="ToggleBorder" Property="Background" Value="{DynamicResource AppAccentBrush}" />
+                                <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="{DynamicResource AppAccentTextBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AppOnAccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="{DynamicResource AppAccentTextBrush}" />
+                                <Setter TargetName="ToggleBorder" Property="BorderThickness" Value="2" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{DynamicResource AppDisabledBrush}" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="PrimaryToolbarButtonStyle" TargetType="Button" BasedOn="{StaticResource ViewerToolbarButtonStyle}">
             <Setter Property="Background" Value="{DynamicResource AppAccentBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
@@ -355,25 +391,26 @@
 
         <Border Grid.Row="0" Background="{DynamicResource AppSurfaceBrush}" BorderBrush="{DynamicResource AppBorderBrush}" BorderThickness="0,0,0,1" Padding="16,10">
             <DockPanel LastChildFill="False">
+                <Button x:Name="ExplorerPreviewCloseButton" DockPanel.Dock="Right" Margin="6,0,0,0"
+                        Style="{StaticResource IconToolbarButtonStyle}" Visibility="Collapsed"
+                        Click="OnClosePreviewClick" AutomationProperties.Name="미리보기 닫기"
+                        ToolTip="미리보기 닫기 (Esc / Space)">
+                    <controls:AppIcon Kind="Close" />
+                </Button>
                 <Button x:Name="SettingsButton" DockPanel.Dock="Right"
                         Style="{StaticResource IconToolbarButtonStyle}"
                         AutomationProperties.Name="설정" Click="OnSettingsClick"
                         ToolTip="설정 · 앱 테마, 탐색기 연동, 사용 안내">
                     <controls:AppIcon Kind="Settings" />
                 </Button>
-                <TextBlock x:Name="ExplorerPreviewHint" DockPanel.Dock="Right" Text="Esc 또는 Space로 닫기"
-                           Foreground="{DynamicResource AppMutedBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,12,0" Visibility="Collapsed" />
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
                     <Image Source="Assets/Brand/MoaView.png" Width="28" Height="28" Margin="0,0,7,0" RenderOptions.BitmapScalingMode="HighQuality" />
                     <TextBlock Text="모아뷰" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,16,0" />
-                    <Button x:Name="OpenFileButton" Style="{StaticResource ViewerToolbarButtonStyle}"
+                    <Button x:Name="OpenFileButton" Style="{StaticResource IconToolbarButtonStyle}"
                             Visibility="{Binding OpenedFileVisibility}"
                             Command="{Binding OpenFileCommand}" CommandParameter="{Binding ElementName=RootWindow}"
                             AutomationProperties.Name="파일 열기" ToolTip="미리 볼 파일 열기 (Ctrl+O)">
-                        <StackPanel Orientation="Horizontal">
-                            <controls:AppIcon Kind="Open" Margin="0,0,7,0" />
-                            <TextBlock Text="파일 열기" VerticalAlignment="Center" />
-                        </StackPanel>
+                        <controls:AppIcon Kind="Open" />
                     </Button>
                 </StackPanel>
             </DockPanel>
@@ -695,13 +732,21 @@
             <DockPanel x:Name="TextViewport" Grid.Column="1" Visibility="{Binding TextVisibility}" Margin="16">
                 <TextBlock DockPanel.Dock="Top" Text="{Binding ContentDescription}" Foreground="{DynamicResource AppAccentTextBrush}" Margin="0,0,0,10" TextWrapping="Wrap" />
                 <WrapPanel x:Name="MarkdownToolbar" DockPanel.Dock="Top" Visibility="{Binding MarkdownToolbarVisibility}" Margin="0,0,0,10">
-                    <CheckBox x:Name="MarkdownSourceToggle" Content="원문 보기" IsChecked="{Binding ShowMarkdownSource}"
-                              VerticalAlignment="Center" Foreground="{DynamicResource AppTextBrush}" />
+                    <CheckBox x:Name="MarkdownSourceToggle" IsChecked="{Binding ShowMarkdownSource}"
+                              Style="{StaticResource IconToolbarToggleStyle}" AutomationProperties.Name="원문 보기"
+                              AutomationProperties.HelpText="선택하면 마크다운 원문, 해제하면 서식 미리보기를 표시합니다."
+                              ToolTip="원문 보기 / 서식 미리보기 전환">
+                        <controls:AppIcon Kind="Code" />
+                    </CheckBox>
                 </WrapPanel>
-                <ComboBox x:Name="DocumentSectionPicker" DockPanel.Dock="Top" Margin="0,0,0,12"
-                          Visibility="{Binding DocumentSectionVisibility}"
-                          ItemsSource="{Binding DocumentSections}" SelectedItem="{Binding SelectedDocumentSection, Mode=TwoWay}"
-                          DisplayMemberPath="Title" Style="{StaticResource ToolbarComboBoxStyle}" />
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12" Visibility="{Binding DocumentSectionVisibility}">
+                    <controls:AppIcon Kind="Sections" Margin="0,0,8,0" VerticalAlignment="Center"
+                                      Foreground="{DynamicResource AppMutedBrush}" />
+                    <ComboBox x:Name="DocumentSectionPicker" Visibility="{Binding DocumentSectionVisibility}"
+                              ItemsSource="{Binding DocumentSections}" SelectedItem="{Binding SelectedDocumentSection, Mode=TwoWay}"
+                              AutomationProperties.Name="문서 · 시트 · 슬라이드 선택" ToolTip="미리 볼 문서, 시트 또는 슬라이드 선택"
+                              DisplayMemberPath="Title" Style="{StaticResource ToolbarComboBoxStyle}" />
+                </DockPanel>
                 <Grid>
                 <TextBox x:Name="PreviewText" Text="{Binding TextContent, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True"
                          Visibility="{Binding TextSourceVisibility}"

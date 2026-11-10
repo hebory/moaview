@@ -107,6 +107,8 @@ public sealed class AppIcon : Control
         [AppIconKind.RepeatOne] = Paths("M4 10V8a3 3 0 0 1 3-3h13m-4-3 4 3-4 3", "M20 14v2a3 3 0 0 1-3 3H4m4 3-4-3 4-3", "M10 10l2-1v6m-2 0h4"),
         [AppIconKind.Shuffle] = Paths("M3 6h3c5 0 7 12 12 12h3m-4-4 4 4-4 4", "M3 18h3c5 0 7-12 12-12h3m-4-4 4 4-4 4"),
         [AppIconKind.Playlist] = Paths("M4 5h16M4 10h16M4 15h7M4 20h7", "M15 14l6 4-6 4Z"),
+        [AppIconKind.Code] = Paths("m8 6-6 6 6 6", "m16 6 6 6-6 6", "m14 3-4 18"),
+        [AppIconKind.Sections] = Paths("M7 3h14v14H7z", "M3 7v14h14", "M11 7h6m-6 4h6"),
     };
 
     private static IconGeometry[] Paths(params string[] geometries) => geometries.Select(path => Parse(path)).ToArray();
@@ -160,5 +162,7 @@ public enum AppIconKind
     Repeat,
     RepeatOne,
     Shuffle,
-    Playlist
+    Playlist,
+    Code,
+    Sections
 }

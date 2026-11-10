@@ -10,10 +10,10 @@
 </head>
 <body>
   <header>
-    <label>아트보드 <select id="artboard" aria-label="아트보드"></select></label>
-    <label>재생 <select id="animation" aria-label="애니메이션 또는 상태 머신"></select></label>
-    <button id="pause" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path class="pause-mark" d="M8 5v14m8-14v14"/><path class="play-mark" d="m8 5 11 7-11 7Z"/></svg><span id="pause-label">일시정지</span></button>
-    <button id="restart" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 10a8 8 0 1 1-.2 4M4 4v6h6"/></svg><span>처음부터</span></button>
+    <label title="아트보드 선택"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 8h8v8H8z"/></svg><select id="artboard" aria-label="아트보드"></select></label>
+    <label title="애니메이션 또는 상태 머신 선택"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="18" cy="15" r="3"/></svg><select id="animation" aria-label="애니메이션 또는 상태 머신"></select></label>
+    <button id="pause" title="일시정지" aria-label="일시정지" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path class="pause-mark" d="M8 5v14m8-14v14"/><path class="play-mark" d="m8 5 11 7-11 7Z"/></svg></button>
+    <button id="restart" title="처음부터" aria-label="처음부터" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 10a8 8 0 1 1-.2 4M4 4v6h6"/></svg></button>
   </header>
   <main><canvas id="canvas" aria-label="Rive 애니메이션"></canvas></main>
   <footer id="status" role="status">Rive 파일을 준비하고 있습니다.</footer>
