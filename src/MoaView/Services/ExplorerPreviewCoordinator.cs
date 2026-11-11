@@ -24,6 +24,7 @@ public sealed class ExplorerPreviewCoordinator(
     private bool _opening;
     private bool _queryPending;
     private bool _disposed;
+    private ExplorerContext? _pendingOpen;
     private ExplorerContext _source;
     private string? _path;
 
@@ -34,10 +35,27 @@ public sealed class ExplorerPreviewCoordinator(
             return;
         }
 
+        if (_pendingOpen is { } pending)
+        {
+            // Keep only the latest deliberate Space target while an older Shell call drains.
+            _pendingOpen = pending == context ? null : context;
+            return;
+        }
+
         if (_opening || presenter.IsOpen)
         {
+            if (_source == context)
+            {
+                Close();
+                return;
+            }
+
             Close();
-            return;
+            if (_queryPending)
+            {
+                _pendingOpen = context;
+                return;
+            }
         }
 
         // A cancelled COM call may still be completing. Do not queue more work behind it.
@@ -52,6 +70,7 @@ public sealed class ExplorerPreviewCoordinator(
         try
         {
             var path = await ReadSelectionAsync(context);
+            await OpenPendingSelectionAsync();
             if (_disposed || generation != _generation || getCurrentContext() != context)
             {
                 return;
@@ -94,6 +113,7 @@ public sealed class ExplorerPreviewCoordinator(
 
         var generation = _generation;
         var path = await ReadSelectionAsync(context);
+        await OpenPendingSelectionAsync();
         if (_disposed || generation != _generation || !presenter.IsOpen || getCurrentContext() != context)
         {
             return;
@@ -124,10 +144,25 @@ public sealed class ExplorerPreviewCoordinator(
         }
     }
 
+    private async Task OpenPendingSelectionAsync()
+    {
+        if (_pendingOpen is not { } context)
+        {
+            return;
+        }
+
+        _pendingOpen = null;
+        if (!_disposed && getCurrentContext() == context)
+        {
+            await ToggleAsync(context);
+        }
+    }
+
     public void Close()
     {
         ++_generation;
         _opening = false;
+        _pendingOpen = null;
         _path = null;
         presenter.Close();
     }

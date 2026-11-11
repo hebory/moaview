@@ -161,6 +161,113 @@ public sealed class ExplorerPreviewTests
     }
 
     [Fact]
+    public async Task Coordinator_SpaceOnAnotherExplorerImmediatelyOpensThatSelection()
+    {
+        var selection = new SelectionStub { Path = @"C:\one.png" };
+        var presenter = new PresenterStub();
+        ExplorerContext? current = FirstView;
+        using var coordinator = new ExplorerPreviewCoordinator(selection, presenter, () => current);
+
+        await coordinator.ToggleAsync(FirstView);
+        var otherWindow = new ExplorerContext(200, 201);
+        current = otherWindow;
+        selection.Path = @"C:\two.png";
+
+        await coordinator.ToggleAsync(otherWindow);
+
+        Assert.True(presenter.IsOpen);
+        Assert.Equal(selection.Path, presenter.Path);
+        Assert.Equal(otherWindow, presenter.Context);
+        Assert.Equal(2, presenter.ShowCount);
+    }
+
+    [Fact]
+    public async Task Coordinator_OtherExplorerSpaceWaitsForOldReadAndDiscardsItsLateReply()
+    {
+        var pending = new TaskCompletionSource<string?>();
+        var selection = new SelectionStub { Pending = pending.Task };
+        var presenter = new PresenterStub();
+        ExplorerContext? current = FirstView;
+        using var coordinator = new ExplorerPreviewCoordinator(selection, presenter, () => current);
+
+        var oldOpening = coordinator.ToggleAsync(FirstView);
+        var otherWindow = new ExplorerContext(200, 201);
+        current = otherWindow;
+        selection.Pending = null;
+        selection.Path = @"C:\two.png";
+
+        await coordinator.ToggleAsync(otherWindow);
+        pending.SetResult(@"C:\stale.png");
+        await oldOpening;
+
+        Assert.Equal(selection.Path, presenter.Path);
+        Assert.Equal(otherWindow, presenter.Context);
+        Assert.Equal(1, presenter.ShowCount);
+        Assert.Equal(2, selection.ReadCount);
+    }
+
+    [Fact]
+    public async Task Coordinator_SpaceOnAnotherExplorerWithNoSelectionKeepsPreviewClosed()
+    {
+        var selection = new SelectionStub { Path = @"C:\one.png" };
+        var presenter = new PresenterStub();
+        ExplorerContext? current = FirstView;
+        using var coordinator = new ExplorerPreviewCoordinator(selection, presenter, () => current);
+
+        await coordinator.ToggleAsync(FirstView);
+        var otherWindow = new ExplorerContext(200, 201);
+        current = otherWindow;
+        selection.Path = null;
+
+        await coordinator.ToggleAsync(otherWindow);
+
+        Assert.False(presenter.IsOpen);
+        Assert.Equal(1, presenter.ShowCount);
+    }
+
+    [Theory]
+    [InlineData("close")]
+    [InlineData("dispose")]
+    [InlineData("focus-changed")]
+    public async Task Coordinator_CancelledPendingExplorerSwitchDoesNotReopenOrQuery(string cancellation)
+    {
+        var pending = new TaskCompletionSource<string?>();
+        var selection = new SelectionStub { Pending = pending.Task };
+        var presenter = new PresenterStub();
+        ExplorerContext? current = FirstView;
+        var coordinator = new ExplorerPreviewCoordinator(selection, presenter, () => current);
+
+        var oldOpening = coordinator.ToggleAsync(FirstView);
+        var otherWindow = new ExplorerContext(200, 201);
+        current = otherWindow;
+        await coordinator.ToggleAsync(otherWindow);
+        Assert.Equal(1, selection.ReadCount);
+
+        if (cancellation == "close")
+        {
+            coordinator.Close();
+        }
+        else if (cancellation == "dispose")
+        {
+            coordinator.Dispose();
+        }
+        else
+        {
+            current = new ExplorerContext(300, 301);
+        }
+
+        selection.Pending = null;
+        selection.Path = @"C:\should-not-open.png";
+        pending.SetResult(@"C:\stale.png");
+        await oldOpening;
+
+        Assert.False(presenter.IsOpen);
+        Assert.Equal(0, presenter.ShowCount);
+        Assert.Equal(1, selection.ReadCount);
+        coordinator.Dispose();
+    }
+
+    [Fact]
     public async Task Coordinator_CloseDuringRefreshAndDisposeInvalidatePendingReplies()
     {
         var selection = new SelectionStub { Path = @"C:\one.png" };

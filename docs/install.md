@@ -40,3 +40,14 @@ powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1 -Version 0.
 ```
 
 개발 빌드에서 생성한 공개 `MoaView-Development.cer`는 해당 빌드의 Windows 패키지 등록을 검증할 때 사용합니다. 설치하려는 Windows가 그 인증서를 신뢰해야 하며 설치 프로그램은 인증서 신뢰 저장소를 변경하지 않습니다. 신뢰된 배포용 서명 인증서가 `CurrentUser\My`에 있으면 첫 명령에서 `-DevelopmentCertificate` 대신 `-SigningThumbprint`로 인증서를 지정할 수 있습니다. [Microsoft 패키지 서명 안내](https://learn.microsoft.com/en-us/windows/apps/desktop/modernize/grant-identity-to-nonpackaged-apps#build-and-sign-the-identity-package)
+
+
+## 무설치 실행본 검증
+
+자체 포함 게시 폴더의 `MoaView.exe`를 실행할 수 있으며 .NET 설치가 필요하지 않습니다. 폴더 전체를 함께 유지하세요. 기존 설치 앱이 트레이에서 실행 중이면 먼저 트레이 메뉴의 **MoaView 종료**로 끝내야 새 실행본이 사용됩니다.
+
+```powershell
+powershell.exe -NoProfile -File scripts/Test-Portable.ps1 -PublishDirectory artifacts/publish/win-x64
+```
+
+이 검사는 새 폴더 복사본에서 실제 창을 기동해 JPEG·PNG·BMP·정적 GIF·TIFF, ZIP 목록, 손상·미지원 안내를 확인하고 결과 JSON을 남깁니다. 전역 .NET 경로는 자식 프로세스에 한해 제한하고, 기존 설치·레지스트리를 변경하지 않으며 사용자 테마 설정 해시도 대조합니다. 깨끗한 Windows 설치·제거 또는 WebView2 미설치 환경 검증을 대신하지 않습니다. [QUIC-7 검증 범위](QUIC-7-usability-verification.md)
