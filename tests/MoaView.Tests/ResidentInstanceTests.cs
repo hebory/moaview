@@ -6,6 +6,9 @@ using Xunit;
 
 namespace MoaView.Tests;
 
+// System.Threading.Mutex has thread affinity, so the owning ResidentInstance must be created and disposed on the same thread.
+#pragma warning disable xUnit1031
+
 public sealed class ResidentInstanceTests
 {
     [Fact]

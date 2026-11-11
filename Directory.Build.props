@@ -3,6 +3,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
+    <WindowsSdkPackageVersion>10.0.19041.31</WindowsSdkPackageVersion>
     <BuildInParallel>false</BuildInParallel>
     <RestoreBuildInParallel>false</RestoreBuildInParallel>
     <RestoreDisableParallel>true</RestoreDisableParallel>

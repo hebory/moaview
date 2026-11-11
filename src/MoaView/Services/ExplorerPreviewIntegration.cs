@@ -5,6 +5,8 @@ namespace MoaView.Services;
 /// <summary>Owns the process-local UI, timers and the one-per-session Explorer hotkey listener.</summary>
 public sealed class ExplorerPreviewIntegration : IDisposable
 {
+    public const string DefaultMutexName = @"Local\MoaView.ExplorerSpacePreview";
+
     private readonly Mutex _mutex;
     private readonly WindowsExplorerSelectionService _selection;
     private readonly ExplorerPreviewCoordinator _coordinator;
@@ -12,9 +14,10 @@ public sealed class ExplorerPreviewIntegration : IDisposable
     private readonly DispatcherTimer _timer;
     private bool _disposed;
 
-    public ExplorerPreviewIntegration(Dispatcher dispatcher)
+    public ExplorerPreviewIntegration(Dispatcher dispatcher, string mutexName = DefaultMutexName)
     {
-        _mutex = new Mutex(false, @"Local\MoaView.ExplorerSpacePreview");
+        ArgumentException.ThrowIfNullOrWhiteSpace(mutexName);
+        _mutex = new Mutex(false, mutexName);
         bool acquired;
         try
         {

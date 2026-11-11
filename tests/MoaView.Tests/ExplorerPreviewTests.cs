@@ -253,16 +253,18 @@ public sealed class ExplorerPreviewTests
     [Fact]
     public void Integration_StartStopAndRestartReleasesNativeHookAndSessionLock()
     {
+        Assert.Equal(@"Local\MoaView.ExplorerSpacePreview", ExplorerPreviewIntegration.DefaultMutexName);
+        var mutexName = $@"{ExplorerPreviewIntegration.DefaultMutexName}.Test.{Guid.NewGuid():N}";
         StaTestRunner.Run(() =>
         {
             var dispatcher = Dispatcher.CurrentDispatcher;
-            using (var integration = new ExplorerPreviewIntegration(dispatcher))
+            using (var integration = new ExplorerPreviewIntegration(dispatcher, mutexName))
             {
                 // The named mutex is thread-owned. A second STA must not install another hook.
                 StaTestRunner.Run(() =>
                 {
                     var error = Assert.Throws<InvalidOperationException>(() =>
-                        new ExplorerPreviewIntegration(Dispatcher.CurrentDispatcher));
+                        new ExplorerPreviewIntegration(Dispatcher.CurrentDispatcher, mutexName));
                     Assert.Contains("다른 모아뷰", error.Message);
                 });
                 integration.Dispose();
@@ -270,7 +272,7 @@ public sealed class ExplorerPreviewTests
             }
 
             // Exercise re-enabling after the hook thread and the selection worker shut down.
-            using var restarted = new ExplorerPreviewIntegration(dispatcher);
+            using var restarted = new ExplorerPreviewIntegration(dispatcher, mutexName);
         });
     }
 
