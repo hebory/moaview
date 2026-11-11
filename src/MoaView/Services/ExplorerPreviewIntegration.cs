@@ -49,7 +49,7 @@ public sealed class ExplorerPreviewIntegration : IDisposable
                         }
                     }));
                 }
-            });
+            }, ExplorerPreviewDiagnostics.Write);
 
             _timer = new DispatcherTimer(DispatcherPriority.Background, dispatcher)
             {
