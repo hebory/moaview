@@ -13,7 +13,7 @@ internal static class ExplorerPreviewDiagnostics
         {
             lock (Gate)
             {
-                var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MoaView", "Logs");
+                var directory = MoaViewLocalAppData.GetPath("Logs");
                 Directory.CreateDirectory(directory);
                 var path = Path.Combine(directory, "explorer-space.log");
                 if (File.Exists(path) && new FileInfo(path).Length > 128 * 1024)

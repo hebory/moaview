@@ -5,6 +5,15 @@ namespace MoaView.Services;
 
 public sealed class ExplorerPreviewPresenter : IExplorerPreviewPresenter
 {
+    private readonly Func<MainWindowViewModel> _viewModelFactory;
+    private readonly AppAppearance? _appearance;
+
+    public ExplorerPreviewPresenter(Func<MainWindowViewModel>? viewModelFactory = null, AppAppearance? appearance = null)
+    {
+        _viewModelFactory = viewModelFactory ?? (() => new MainWindowViewModel());
+        _appearance = appearance;
+    }
+
     public MainWindow? Window { get; private set; }
 
     public bool IsOpen => Window is { IsVisible: true };
@@ -13,7 +22,7 @@ public sealed class ExplorerPreviewPresenter : IExplorerPreviewPresenter
     {
         if (Window is null)
         {
-            var window = new MainWindow(new MainWindowViewModel(), isExplorerPreview: true)
+            var window = new MainWindow(_viewModelFactory(), isExplorerPreview: true, appearance: _appearance)
             {
                 ShowActivated = false,
                 ShowInTaskbar = false,

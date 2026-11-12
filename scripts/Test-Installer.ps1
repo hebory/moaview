@@ -149,6 +149,26 @@ function Assert-ExplorerMenu([string]$File) {
     }
 }
 
+function Get-FileFingerprint([string]$Path) {
+    if (!(Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+}
+
+$userDataRoot = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)) 'MoaView'
+$userDataExistedBefore = Test-Path -LiteralPath $userDataRoot -PathType Container
+$userSettings = @(
+    [pscustomobject]@{ Name = 'app-theme.json'; Path = (Join-Path $userDataRoot 'app-theme.json'); DefaultJson = '{"theme":"Light"}'; ExistedBefore = $false; ExpectedHash = $null },
+    [pscustomobject]@{ Name = 'markdown-theme.json'; Path = (Join-Path $userDataRoot 'markdown-theme.json'); DefaultJson = '{"theme":"Sepia"}'; ExistedBefore = $false; ExpectedHash = $null }
+)
+foreach ($setting in $userSettings) {
+    $setting.ExistedBefore = Test-Path -LiteralPath $setting.Path -PathType Leaf
+    if (!$setting.ExistedBefore) {
+        New-Item -ItemType Directory -Path $userDataRoot -Force | Out-Null
+        [IO.File]::WriteAllText($setting.Path, $setting.DefaultJson, [Text.UTF8Encoding]::new($false))
+    }
+    $setting.ExpectedHash = Get-FileFingerprint $setting.Path
+}
+
 try {
     $setup = Start-Process -FilePath $Installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/NOICONS','/TASKS=',"/DIR=`"$target`"","/LOG=`"$installLog`"") -WindowStyle Hidden -Wait -PassThru
     if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
@@ -205,6 +225,11 @@ try {
     '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect width="40" height="30" fill="blue"/></svg>' |
         Set-Content -LiteralPath $svg -Encoding UTF8
     Assert-Startup 'SVG' $svg 'SpecializedLoaded'
+    foreach ($setting in $userSettings) {
+        if ((Get-FileFingerprint $setting.Path) -ne $setting.ExpectedHash) {
+            throw "Startup verification modified or removed user setting: $($setting.Name)"
+        }
+    }
     $results.Add([pscustomobject]@{Case='Install registration and payload';Passed=$true})
 } finally {
     $uninstaller = Join-Path $target 'unins000.exe'
@@ -214,7 +239,23 @@ try {
         $runRemaining = if (Test-Path -LiteralPath $runKey) { (Get-Item -LiteralPath $runKey).GetValue('MoaView', $null) } else { $null }
         if ((Test-Path -LiteralPath (Join-Path $target 'MoaView.exe')) -or (Test-Path -LiteralPath $registryPath) -or (Test-Path -LiteralPath $menuKey) -or ($null -ne $runRemaining)) { throw 'Uninstall left application files or registration.' }
         if (Get-AppxPackage -Name $identityName) { throw 'Uninstall left the Explorer identity package registered.' }
+        foreach ($setting in $userSettings) {
+            if ((Get-FileFingerprint $setting.Path) -ne $setting.ExpectedHash) {
+                throw "Uninstall removed or modified user setting: $($setting.Name)"
+            }
+        }
+        $results.Add([pscustomobject]@{Case='User settings preserved across install and uninstall';Passed=$true})
         $results.Add([pscustomobject]@{Case='Uninstall';Passed=$true})
+    }
+    foreach ($setting in $userSettings) {
+        if (!$setting.ExistedBefore -and (Test-Path -LiteralPath $setting.Path -PathType Leaf)) {
+            Remove-Item -LiteralPath $setting.Path -Force -ErrorAction SilentlyContinue
+        }
+    }
+    if (!$userDataExistedBefore -and (Test-Path -LiteralPath $userDataRoot -PathType Container)) {
+        if (@(Get-ChildItem -LiteralPath $userDataRoot -Force -ErrorAction SilentlyContinue).Count -eq 0) {
+            Remove-Item -LiteralPath $userDataRoot -Force -ErrorAction SilentlyContinue
+        }
     }
     $results | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $checkRoot 'results.json') -Encoding UTF8
 }

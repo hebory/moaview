@@ -13,8 +13,7 @@ public sealed class MarkdownThemeSettings : IMarkdownThemeSettings
 {
     private readonly string _path;
 
-    public MarkdownThemeSettings(string? path = null) => _path = path ?? Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MoaView", "markdown-theme.json");
+    public MarkdownThemeSettings(string? path = null) => _path = path ?? MoaViewLocalAppData.GetPath("markdown-theme.json");
 
     public MarkdownTheme Load() => EnumThemePreferenceStore.Load(_path, MarkdownTheme.Dark);
 

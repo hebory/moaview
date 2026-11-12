@@ -107,8 +107,8 @@ internal sealed class BrowserImagePreviewControl : SpecializedPreviewControl
             try
             {
                 _ = WatchTimeoutAsync(cancellation);
-                var environment = await CoreWebView2Environment.CreateAsync(null, Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MoaView", "ImageWebView"));
+                var environment = await CoreWebView2Environment.CreateAsync(null,
+                    MoaViewLocalAppData.GetPath("ImageWebView"));
                 if (IsDisposed || Ready.IsCompleted) return;
                 await _web.EnsureCoreWebView2Async(environment);
                 if (IsDisposed || Ready.IsCompleted) return;

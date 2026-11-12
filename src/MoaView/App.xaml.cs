@@ -316,7 +316,9 @@ public partial class App : Application
             $"|BADGE={vm.NoticeBadgeText}" +
             $"|RIVE={window.RivePlaybackStatus}" +
             $"|SPECIALIZED={specializedStatus}" +
-            $"|PIXELS={result.PixelWidth}x{result.PixelHeight}";
+            $"|PIXELS={result.PixelWidth}x{result.PixelHeight}" +
+            $"|THEME={window.CurrentAppTheme}" +
+            $"|MDTHEME={vm.SelectedMarkdownTheme.Theme}";
 
         using var stdout = Console.OpenStandardOutput();
         if (stdout == Stream.Null || !stdout.CanWrite)

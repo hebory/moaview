@@ -66,7 +66,7 @@ powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1 -Version 0.
 powershell.exe -NoProfile -File scripts/Test-Portable.ps1 -PublishDirectory artifacts/publish/win-x64
 ```
 
-이 검사는 새 폴더 복사본에서 실제 창을 기동해 JPEG·PNG·BMP·정적 GIF·TIFF, ZIP 목록, 손상·미지원 안내를 확인하고 결과 JSON을 남깁니다. 전역 .NET 경로는 자식 프로세스에 한해 제한하고, 기존 설치·레지스트리를 변경하지 않으며 사용자 테마 설정 해시도 대조합니다. 깨끗한 Windows 설치·제거 또는 WebView2 미설치 환경 검증을 대신하지 않습니다. [QUIC-7 검증 범위](QUIC-7-usability-verification.md) · [QUIC-8 검증 및 한계 기록](QUIC-8-clean-environment-verification.md)
+이 검사는 새 폴더 복사본에서 실제 창을 기동해 JPEG·PNG·BMP·정적 GIF·TIFF, ZIP 목록, 손상·미지원 안내를 확인하고 결과 JSON을 남깁니다. 전역 .NET 경로는 자식 프로세스에 한해 제한하고, 기존 설치·레지스트리를 변경하지 않으며 사용자 테마 설정 해시도 대조합니다. 깨끗한 Windows 설치·제거 또는 WebView2 미설치 환경 검증을 대신하지 않습니다. [QUIC-7 검증 범위](QUIC-7-usability-verification.md) · [QUIC-8 검증 및 한계 기록](QUIC-8-clean-environment-verification.md) · [QUIC-9 격리 환경 실검증 기록](QUIC-9-isolated-environment-verification.md)
 
 ## 깨끗한 Windows 환경 설치·실행·제거 검증
 
@@ -87,7 +87,7 @@ powershell.exe -NoProfile -File scripts/Test-Portable.ps1 -PublishDirectory arti
    - 전역 `.NET` 탐색을 차단한 상태로 설치된 `MoaView.exe --verify-startup`을 실행해 빈 시작 화면, 마크다운, 기본 이미지 5종(`JPEG`·`PNG`·`BMP`·`GIF`·`TIFF`), `ZIP` 아카이브, 손상된 이미지 오류 안내(`열기 실패`), 미지원 바이너리 상세 안내, `PPM` 이미지를 검증합니다.
    - 탐색기 우클릭 메뉴 동사(`MoaView.Preview` 또는 Windows 11 `IExplorerCommand`)로 실제 파일 창이 열리고 닫히는지 확인합니다.
    - WebView2 Runtime 설치 여부를 자동 감지하여, 설치된 환경에서는 `Rive`·`SVG` 렌더링 준비(`ready`)를 확인하고, WebView2가 없는 깨끗한 환경에서는 비정상 종료 없이 안내 상태(`error`)로 표시되는지 확인합니다.
-   - 마지막 `finally` 단계에서 `unins000.exe /VERYSILENT`를 실행해 실행 파일, `Uninstall` 레지스트리 키, 탐색기 우클릭 메뉴 키, `Run` 자동 시작 값, Windows 11 식별 패키지가 모두 제거되었는지 검증하고 `artifacts/install-check/<실행ID>/results.json`에 결과를 저장합니다.
+   - 마지막 `finally` 단계에서 `unins000.exe /VERYSILENT`를 실행해 실행 파일, `Uninstall` 레지스트리 키, 탐색기 우클릭 메뉴 키, `Run` 자동 시작 값, Windows 11 식별 패키지가 모두 제거되고 `%LOCALAPPDATA%\MoaView\app-theme.json` 및 `markdown-theme.json` 사용자 설정 해시가 보존되었는지(`User settings preserved across install and uninstall`) 검증한 뒤 `artifacts/install-check/<실행ID>/results.json`에 결과를 저장합니다.
 3. **대화형 설치·탐색기 Space 미리보기·완전 제거 수동 확인**:
    - `MoaView-0.1.12-Setup-x64.exe`를 실행해 기본 경로(`%LOCALAPPDATA%\Programs\MoaView`)에 설치하고 앱을 실행합니다.
    - 탐색기에서 지원 이미지(`JPEG`·`PNG`·`BMP`·`GIF`·`TIFF`), `ZIP` 파일, 미지원 파일을 차례로 선택해 `Space`로 미리보기 열기·파일 전환·`Space`/`Esc` 닫기와 이미지 회전·확대·변환 저장을 확인합니다.

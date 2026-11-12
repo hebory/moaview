@@ -73,7 +73,7 @@ WorkMesh 프로젝트 채널: `moaview`
   - 독립 실행 파일의 ZIP·텍스트·RIV 시작 및 실제 렌더링 검증
   - PUR 포함 PNG/JPEG 경계·손상·크기 제한·부분 복구, WPF 이미지 선택/보기 조작/파일 전환 및 독립 EXE 시작 검증 (합성 컨테이너 사용)
   - 마크다운 서식·원문 전환, 테마별 실제 렌더링 색상, 읽기 위치/선택 유지, 설정 저장/복원/실패, ZIP 내부 MD 및 EXE 시작 검증
-  - 설치·무설치 배포 스크립트·Inno Setup 레지스트리 계약·안내 문서 일관성 및 격리 폴더 복사본 `MoaView.exe`의 기본 형식 5종·ZIP·손상/미지원 안내·`--preview` 모드 독립 기동 및 사용자 설정 보존 검증
+  - 설치·무설치 배포 스크립트·Inno Setup 레지스트리 계약·안내 문서 일관성 및 격리 폴더(`Local\Programs\MoaView`)·격리 `LOCALAPPDATA`·격리 HKCU 레지스트리에서의 설치·실행(기본 형식 5종·ZIP·마크다운·손상/미지원 안내·`--preview` 모드)·탐색기 Space 미리보기·제거·사용자 설정(`app-theme.json`, `markdown-theme.json`) 보존 검증
 
 ## 빌드 및 테스트
 
@@ -93,4 +93,4 @@ RIV·웹 이미지·애니메이션·3D 모델을 표시하려면 Microsoft Edge
 ## 다음 구현 대상 (남은 완료 기준)
 
 - **C2 추가 환경 검증**: 현재 Windows 11 26H2에서 Space 열기·닫기, 선택 전환, 주소창·검색·이름 변경 공백 보존을 확인했습니다. Windows 10, Windows 11 탭 전환과 장시간 사용·절전 복귀는 추가 확인 대상입니다. [QUIC-7 검증 기록](docs/QUIC-7-usability-verification.md)
-- **C9 깨끗한 Windows 환경 설치·제거 실환경 검증**: 무설치 복사본 기동(`Test-Portable.ps1`), 격리 폴더 복사본 기동·`--preview` 자동 회귀 테스트, 설치·제거 스크립트(`Test-Installer.ps1`)의 WebView2 유무 대응과 안내 문서를 보완했습니다. MoaView가 설치되지 않은 별도 Windows 테스트 계정·Windows Sandbox·VM에서의 실제 설치·제거 실행 확인이 남아 있습니다. [QUIC-8 검증 및 한계 기록](docs/QUIC-8-clean-environment-verification.md)
+- **C9 깨끗한 Windows 환경 설치·제거 실환경 검증**: 무설치 복사본 기동(`Test-Portable.ps1`), 격리 설치 폴더·격리 `LOCALAPPDATA`·격리 레지스트리 기반 설치·실행·Space 미리보기·제거·설정 보존 자동 회귀 테스트, 설치·제거 스크립트(`Test-Installer.ps1`)의 WebView2 유무 대응·사용자 설정 해시 보존 검사와 안내 문서를 보완했습니다. MoaView가 설치되지 않은 별도 Windows 테스트 계정·Windows Sandbox·VM에서의 실제 설치·제거 실행 확인이 남아 있습니다. [QUIC-8 검증 및 한계 기록](docs/QUIC-8-clean-environment-verification.md) · [QUIC-9 격리 환경 실검증 기록](docs/QUIC-9-isolated-environment-verification.md)

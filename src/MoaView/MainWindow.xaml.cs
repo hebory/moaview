@@ -78,6 +78,7 @@ public partial class MainWindow : Window
     public MainWindowViewModel ViewModel { get; }
 
     public bool IsExplorerPreview { get; }
+    public AppTheme CurrentAppTheme => _appearance.Theme;
     public string RivePlaybackStatus => _rivePreview?.PlaybackStatus ?? "none";
     public Task<bool> WaitForRivePreviewAsync() => _rivePreview?.Ready ?? Task.FromResult(false);
     public Task<bool> WaitForSpecializedPreviewAsync() => _specializedPreview is LocalMediaPreviewControl media

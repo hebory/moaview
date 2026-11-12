@@ -48,8 +48,8 @@ internal sealed class Model3DPreviewControl : SpecializedPreviewControl
         try
         {
             _ = WatchTimeoutAsync(_lifetime.Token);
-            var environment = await CoreWebView2Environment.CreateAsync(null, Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MoaView", "ModelWebView"));
+            var environment = await CoreWebView2Environment.CreateAsync(null,
+                MoaViewLocalAppData.GetPath("ModelWebView"));
             if (IsDisposed || _failed) return;
             await _web.EnsureCoreWebView2Async(environment);
             if (IsDisposed || _failed) return;

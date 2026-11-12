@@ -64,7 +64,7 @@ public sealed class RivePreviewControl : Grid, IDisposable
                 _web = new WebView2();
                 Children.Insert(0, _web);
                 var environment = await CoreWebView2Environment.CreateAsync(null,
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MoaView", "RiveWebView"));
+                    MoaView.Services.MoaViewLocalAppData.GetPath("RiveWebView"));
                 if (_disposed) return;
                 await _web.EnsureCoreWebView2Async(environment);
                 if (_disposed) return;

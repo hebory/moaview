@@ -2,10 +2,16 @@ using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Threading;
 using System.Xml.Linq;
+using Microsoft.Win32;
 using MoaView.Models;
 using MoaView.Services;
 using MoaView.Tests.TestHelpers;
+using MoaView.ViewModels;
 using Xunit;
 
 namespace MoaView.Tests;
@@ -61,6 +67,9 @@ public sealed class DeploymentAndGuideVerificationTests
         Assert.Contains("content-preview.md", testInstallerText, StringComparison.Ordinal);
         Assert.Contains("third-party-notices.md", testInstallerText, StringComparison.Ordinal);
         Assert.Contains("install.md", testInstallerText, StringComparison.Ordinal);
+        Assert.Contains("app-theme.json", testInstallerText, StringComparison.Ordinal);
+        Assert.Contains("markdown-theme.json", testInstallerText, StringComparison.Ordinal);
+        Assert.Contains("User settings preserved across install and uninstall", testInstallerText, StringComparison.Ordinal);
 
         var testPortableText = File.ReadAllText(Path.Combine(repoRoot, "scripts", "Test-Portable.ps1"));
         Assert.Contains("[string]$RuntimeVersion = '8.0.33'", testPortableText, StringComparison.Ordinal);
@@ -75,11 +84,20 @@ public sealed class DeploymentAndGuideVerificationTests
         Assert.Contains("scripts/Test-Portable.ps1", installDocText, StringComparison.Ordinal);
         Assert.Contains("scripts/Test-Installer.ps1", installDocText, StringComparison.Ordinal);
         Assert.Contains("QUIC-8-clean-environment-verification.md", installDocText, StringComparison.Ordinal);
+        Assert.Contains("QUIC-9-isolated-environment-verification.md", installDocText, StringComparison.Ordinal);
+
+        var quic9DocPath = Path.Combine(repoRoot, "docs", "QUIC-9-isolated-environment-verification.md");
+        Assert.True(File.Exists(quic9DocPath));
+        var quic9DocText = File.ReadAllText(quic9DocPath);
+        Assert.Contains("Test-Installer.ps1", quic9DocText, StringComparison.Ordinal);
+        Assert.Contains("app-theme.json", quic9DocText, StringComparison.Ordinal);
+        Assert.Contains("markdown-theme.json", quic9DocText, StringComparison.Ordinal);
 
         var contentDocText = File.ReadAllText(Path.Combine(repoRoot, "docs", "content-preview.md"));
         var readmeText = File.ReadAllText(Path.Combine(repoRoot, "README.md"));
         Assert.Contains($"MoaView-{version}-Setup-x64.exe", readmeText, StringComparison.Ordinal);
         Assert.Contains("docs/QUIC-8-clean-environment-verification.md", readmeText, StringComparison.Ordinal);
+        Assert.Contains("docs/QUIC-9-isolated-environment-verification.md", readmeText, StringComparison.Ordinal);
 
         foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tiff" })
         {
@@ -167,6 +185,300 @@ public sealed class DeploymentAndGuideVerificationTests
         Assert.Equal(markdownThemeBefore, ComputeFileHashOrNull(hostMarkdownThemePath));
     }
 
+    [Fact]
+    public void IsolatedInstallRunSpacePreviewAndUninstall_PreservesUserSettingsAndCleansUpRegistrations()
+    {
+        var repoRoot = FindRepositoryRoot();
+        var sourceAppDir = FindBuiltApplicationDirectory(repoRoot);
+        using var temp = new TempTestDirectory();
+
+        var isolatedProfile = temp.GetPath("isolated-user");
+        var isolatedLocalAppData = Path.Combine(isolatedProfile, "Local");
+        var isolatedRoamingAppData = Path.Combine(isolatedProfile, "Roaming");
+        var isolatedTemp = temp.GetPath("isolated-temp");
+        var isolatedInstallDir = Path.Combine(isolatedLocalAppData, "Programs", "MoaView");
+        var isolatedUserDataDir = Path.Combine(isolatedLocalAppData, "MoaView");
+        var isolatedAppThemePath = Path.Combine(isolatedUserDataDir, "app-theme.json");
+        var isolatedMarkdownThemePath = Path.Combine(isolatedUserDataDir, "markdown-theme.json");
+        var samplesDir = temp.GetPath("samples");
+
+        Directory.CreateDirectory(isolatedLocalAppData);
+        Directory.CreateDirectory(isolatedRoamingAppData);
+        Directory.CreateDirectory(isolatedTemp);
+        Directory.CreateDirectory(samplesDir);
+
+        var testRegistryRoot = $@"Software\MoaView.Tests\IsolatedInstall_{Guid.NewGuid():N}";
+        var uninstallSubKey = $@"{testRegistryRoot}\Uninstall\{{23C80132-6E95-43B2-AD9B-A283239A5947}}_is1";
+        var menuSubKey = $@"{testRegistryRoot}\Classes\*\shell\MoaView.Preview";
+        var menuCommandSubKey = $@"{menuSubKey}\command";
+        var runSubKey = $@"{testRegistryRoot}\Run";
+
+        var hostLocalAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var hostAppThemePath = Path.Combine(hostLocalAppData, "MoaView", "app-theme.json");
+        var hostMarkdownThemePath = Path.Combine(hostLocalAppData, "MoaView", "markdown-theme.json");
+        var hostAppThemeBefore = ComputeFileHashOrNull(hostAppThemePath);
+        var hostMarkdownThemeBefore = ComputeFileHashOrNull(hostMarkdownThemePath);
+
+        try
+        {
+            // 1. Pre-install clean state check in isolated environment
+            Assert.False(Directory.Exists(isolatedInstallDir));
+            Assert.False(Directory.Exists(isolatedUserDataDir));
+            Assert.Null(Registry.CurrentUser.OpenSubKey(uninstallSubKey, writable: false));
+            Assert.Null(Registry.CurrentUser.OpenSubKey(menuSubKey, writable: false));
+            Assert.Null(Registry.CurrentUser.OpenSubKey(runSubKey, writable: false));
+
+            // 2. Isolated installation: copy payload + guide docs and register Uninstall, Explorer menu, and Run keys
+            CopyDirectoryRecursive(sourceAppDir, isolatedInstallDir);
+            foreach (var docFile in new[] { "install.md", "content-preview.md", "third-party-notices.md" })
+            {
+                File.Copy(Path.Combine(repoRoot, "docs", docFile), Path.Combine(isolatedInstallDir, docFile), overwrite: true);
+            }
+
+            var installedExe = Path.Combine(isolatedInstallDir, "MoaView.exe");
+            foreach (var requiredRelativePath in new[]
+            {
+                "MoaView.exe",
+                "MoaView.dll",
+                "MoaView.runtimeconfig.json",
+                "install.md",
+                "content-preview.md",
+                "third-party-notices.md",
+                "Assets/Rive/vendor/rive.wasm",
+                "Assets/ThreeD/index.html",
+                "Assets/Bpg/bpgdec.js",
+                "Assets/Licenses/Markdig.txt",
+                "Assets/Licenses/SharpCompress.txt",
+                "Assets/Licenses/Magick.NET-Notices.txt",
+            })
+            {
+                Assert.True(
+                    File.Exists(Path.Combine(isolatedInstallDir, requiredRelativePath)),
+                    $"Missing installed payload file: {requiredRelativePath}");
+            }
+
+            using (var uninstallKey = Registry.CurrentUser.CreateSubKey(uninstallSubKey, writable: true))
+            {
+                Assert.NotNull(uninstallKey);
+                uninstallKey!.SetValue("DisplayName", "MoaView", RegistryValueKind.String);
+                uninstallKey.SetValue("InstallLocation", isolatedInstallDir, RegistryValueKind.String);
+            }
+
+            using (var menuKey = Registry.CurrentUser.CreateSubKey(menuSubKey, writable: true))
+            {
+                Assert.NotNull(menuKey);
+                menuKey!.SetValue("MUIVerb", "MoaView로 미리보기", RegistryValueKind.String);
+                menuKey.SetValue("Icon", $"\"{installedExe}\",0", RegistryValueKind.String);
+                menuKey.SetValue("MultiSelectModel", "Single", RegistryValueKind.String);
+            }
+
+            using (var commandKey = Registry.CurrentUser.CreateSubKey(menuCommandSubKey, writable: true))
+            {
+                Assert.NotNull(commandKey);
+                commandKey!.SetValue(string.Empty, $"\"{installedExe}\" --preview \"%1\"", RegistryValueKind.String);
+            }
+
+            using (var runKey = Registry.CurrentUser.CreateSubKey(runSubKey, writable: true))
+            {
+                Assert.NotNull(runKey);
+                runKey!.SetValue("ExistingUserApp", "\"C:\\Tools\\ExistingUserApp.exe\"", RegistryValueKind.String);
+            }
+
+            var startupRegistration = new WindowsStartupRegistration(installedExe, runSubKey);
+            Assert.False(startupRegistration.IsEnabled);
+            Assert.True(startupRegistration.TrySetEnabled(true, out var enableError), enableError);
+            Assert.True(startupRegistration.IsEnabled);
+
+            // 3. Save user settings in isolated LOCALAPPDATA and verify installed MoaView.exe startup loads them
+            var appThemeSettings = new FileAppThemeSettings(isolatedAppThemePath);
+            var markdownThemeSettings = new MarkdownThemeSettings(isolatedMarkdownThemePath);
+            Assert.True(appThemeSettings.TrySave(AppTheme.Light));
+            Assert.True(markdownThemeSettings.TrySave(MarkdownTheme.Sepia));
+
+            var expectedIsolatedAppThemeHash = ComputeFileHashOrNull(isolatedAppThemePath);
+            var expectedIsolatedMarkdownThemeHash = ComputeFileHashOrNull(isolatedMarkdownThemePath);
+            Assert.False(string.IsNullOrEmpty(expectedIsolatedAppThemeHash));
+            Assert.False(string.IsNullOrEmpty(expectedIsolatedMarkdownThemeHash));
+
+            var jpgSample = SampleImageFactory.WriteValidImage(Path.Combine(samplesDir, "sample.jpg"), ImageFormatKind.Jpeg, 24, 16);
+            var pngSample = SampleImageFactory.WriteValidImage(Path.Combine(samplesDir, "sample.png"), ImageFormatKind.Png, 24, 16);
+            var bmpSample = SampleImageFactory.WriteValidImage(Path.Combine(samplesDir, "sample.bmp"), ImageFormatKind.Bmp, 24, 16);
+            var gifSample = SampleImageFactory.WriteValidImage(Path.Combine(samplesDir, "sample.gif"), ImageFormatKind.Gif, 24, 16);
+            var tiffSample = SampleImageFactory.WriteValidImage(Path.Combine(samplesDir, "sample.tiff"), ImageFormatKind.Tiff, 24, 16);
+
+            var mdSample = Path.Combine(samplesDir, "guide.md");
+            File.WriteAllText(mdSample, "# MoaView QUIC-9\r\n\r\nIsolated install and Space preview verification.", Encoding.UTF8);
+
+            var zipSample = ContentPreviewTests.WriteZip(
+                Path.Combine(samplesDir, "archive.zip"),
+                new Dictionary<string, byte[]>
+                {
+                    ["readme.txt"] = Encoding.UTF8.GetBytes("Archive text preview"),
+                    ["sample.png"] = File.ReadAllBytes(pngSample),
+                });
+
+            var damagedJpg = Path.Combine(samplesDir, "damaged.jpg");
+            File.WriteAllBytes(damagedJpg, [0xFF, 0xD8, 0x00, 0x22]);
+
+            var unsupportedBin = Path.Combine(samplesDir, "unknown.bin");
+            File.WriteAllBytes(unsupportedBin, [0x00, 0x01, 0xFF]);
+
+            AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, "--verify-startup", "Empty", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
+            AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{jpgSample}\"", "ImageLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
+            AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{pngSample}\"", "ImageLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
+            AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{bmpSample}\"", "ImageLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
+            AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{gifSample}\"", "ImageLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
+            AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{tiffSample}\"", "ImageLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
+            AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{zipSample}\"", "ArchiveLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
+            AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{mdSample}\"", "TextLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
+            AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{damagedJpg}\"", "Error", expectedBadge: "열기 실패", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
+            AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{unsupportedBin}\"", "TextLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
+            AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup --preview \"{pngSample}\"", "ImageLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
+
+            // 4. Verify Explorer Space preview, selection switching, image manipulation/conversion, and ZIP internal preview
+            var convertedOutputPath = Path.Combine(samplesDir, "converted-from-space.png");
+            StaTestRunner.Run(() =>
+            {
+                var isolatedAppearance = new AppAppearance(new FileAppThemeSettings(isolatedAppThemePath));
+                var presenter = new ExplorerPreviewPresenter(
+                    () =>
+                    {
+                        var dialogs = new Win32FileDialogService();
+                        return new MainWindowViewModel(
+                            new FilePreviewService(),
+                            dialogs,
+                            dialogs,
+                            markdownThemeSettings: new MarkdownThemeSettings(isolatedMarkdownThemePath));
+                    },
+                    isolatedAppearance);
+
+                var explorerOwner = new MainWindow { ShowActivated = false, ShowInTaskbar = false };
+                try
+                {
+                    explorerOwner.Show();
+                    var explorerContext = new ExplorerContext(new WindowInteropHelper(explorerOwner).Handle, 1);
+                    var selection = new IsolatedExplorerSelectionStub { SelectedPath = jpgSample };
+                    using var coordinator = new ExplorerPreviewCoordinator(selection, presenter, () => explorerContext);
+
+                    // Space opens preview for selected JPEG
+                    CompleteSynchronously(coordinator.ToggleAsync(explorerContext));
+                    Assert.True(presenter.IsOpen);
+                    var peekWindow = presenter.Window!;
+                    RenderWindow(peekWindow);
+                    Assert.True(peekWindow.IsExplorerPreview);
+                    Assert.Equal(AppTheme.Light, peekWindow.CurrentAppTheme);
+                    Assert.Equal(explorerContext.WindowHandle, new WindowInteropHelper(peekWindow).Owner);
+                    Assert.True(peekWindow.VerifyRenderedState());
+                    Assert.Equal(24, peekWindow.ViewModel.DisplayPixelWidth);
+                    Assert.Equal(16, peekWindow.ViewModel.DisplayPixelHeight);
+
+                    // Image manipulation (zoom, fit, 90-degree rotation) and conversion (JPEG -> PNG)
+                    Assert.True(peekWindow.HandleKeyInput(Key.OemPlus));
+                    Assert.True(peekWindow.HandleKeyInput(Key.F));
+                    Assert.True(peekWindow.HandleKeyInput(Key.R));
+                    RenderWindow(peekWindow);
+                    Assert.Equal(90, peekWindow.ViewModel.RotationDegrees);
+                    Assert.Equal(16, peekWindow.ViewModel.DisplayPixelWidth);
+                    Assert.Equal(24, peekWindow.ViewModel.DisplayPixelHeight);
+                    Assert.True(peekWindow.VerifyRenderedState());
+
+                    var conversionResult = peekWindow.ViewModel.ConvertCurrentImageTo(convertedOutputPath);
+                    Assert.True(conversionResult.IsSuccess, conversionResult.Message);
+                    Assert.True(File.Exists(convertedOutputPath));
+                    var reloadedConverted = new FilePreviewService().Load(convertedOutputPath);
+                    Assert.Equal(PreviewStateKind.ImageLoaded, reloadedConverted.State);
+                    Assert.Equal(24, reloadedConverted.PixelWidth);
+                    Assert.Equal(16, reloadedConverted.PixelHeight);
+
+                    // Switch Explorer selection to ZIP archive and preview internal PNG and text entries
+                    selection.SelectedPath = zipSample;
+                    CompleteSynchronously(coordinator.RefreshAsync());
+                    RenderWindow(peekWindow);
+                    Assert.Equal(PreviewStateKind.ArchiveLoaded, peekWindow.ViewModel.State);
+                    Assert.True(peekWindow.VerifyRenderedState());
+
+                    peekWindow.ViewModel.SelectedArchiveEntry = peekWindow.ViewModel.ArchiveEntries.Single(entry => entry.Name == "sample.png");
+                    RenderWindow(peekWindow);
+                    Assert.Equal(PreviewStateKind.ImageLoaded, peekWindow.ViewModel.State);
+                    Assert.True(peekWindow.VerifyRenderedState());
+
+                    peekWindow.ViewModel.SelectedArchiveEntry = peekWindow.ViewModel.ArchiveEntries.Single(entry => entry.Name == "readme.txt");
+                    RenderWindow(peekWindow);
+                    Assert.Equal(PreviewStateKind.TextLoaded, peekWindow.ViewModel.State);
+                    Assert.Contains("Archive text preview", peekWindow.ViewModel.TextContent, StringComparison.Ordinal);
+                    Assert.True(peekWindow.VerifyRenderedState());
+
+                    // Switch Explorer selection to Markdown file and verify Sepia theme preference
+                    selection.SelectedPath = mdSample;
+                    CompleteSynchronously(coordinator.RefreshAsync());
+                    RenderWindow(peekWindow);
+                    Assert.Equal(PreviewStateKind.TextLoaded, peekWindow.ViewModel.State);
+                    Assert.True(peekWindow.ViewModel.IsMarkdownRendered);
+                    Assert.Equal(MarkdownTheme.Sepia, peekWindow.ViewModel.SelectedMarkdownTheme.Theme);
+                    Assert.True(peekWindow.VerifyRenderedState());
+
+                    // Switch Explorer selection to damaged image and unsupported binary
+                    selection.SelectedPath = damagedJpg;
+                    CompleteSynchronously(coordinator.RefreshAsync());
+                    RenderWindow(peekWindow);
+                    Assert.Equal(PreviewStateKind.Error, peekWindow.ViewModel.State);
+                    Assert.True(peekWindow.VerifyRenderedState());
+
+                    selection.SelectedPath = unsupportedBin;
+                    CompleteSynchronously(coordinator.RefreshAsync());
+                    RenderWindow(peekWindow);
+                    Assert.Equal(PreviewStateKind.TextLoaded, peekWindow.ViewModel.State);
+                    Assert.True(peekWindow.VerifyRenderedState());
+
+                    // Space closes Explorer preview window
+                    CompleteSynchronously(coordinator.ToggleAsync(explorerContext));
+                    Assert.False(presenter.IsOpen);
+                    Assert.Null(presenter.Window);
+                }
+                finally
+                {
+                    presenter.Close();
+                    explorerOwner.Close();
+                }
+            });
+
+            // 5. Uninstall: remove startup registration, shell menu key, uninstall key, and installed payload directory
+            Assert.True(startupRegistration.TrySetEnabled(false, out var disableError), disableError);
+            Registry.CurrentUser.DeleteSubKeyTree(menuSubKey, throwOnMissingSubKey: false);
+            Registry.CurrentUser.DeleteSubKeyTree(uninstallSubKey, throwOnMissingSubKey: false);
+            Directory.Delete(isolatedInstallDir, recursive: true);
+
+            Assert.False(File.Exists(installedExe));
+            Assert.False(Directory.Exists(isolatedInstallDir));
+            Assert.Null(Registry.CurrentUser.OpenSubKey(uninstallSubKey, writable: false));
+            Assert.Null(Registry.CurrentUser.OpenSubKey(menuSubKey, writable: false));
+            Assert.False(startupRegistration.IsEnabled);
+
+            using (var runKeyAfterUninstall = Registry.CurrentUser.OpenSubKey(runSubKey, writable: false))
+            {
+                Assert.NotNull(runKeyAfterUninstall);
+                Assert.Null(runKeyAfterUninstall!.GetValue("MoaView"));
+                Assert.Equal("\"C:\\Tools\\ExistingUserApp.exe\"", runKeyAfterUninstall.GetValue("ExistingUserApp"));
+            }
+
+            // Verify user settings in %LOCALAPPDATA%\MoaView are preserved across install, run, and uninstall
+            Assert.True(File.Exists(isolatedAppThemePath));
+            Assert.True(File.Exists(isolatedMarkdownThemePath));
+            Assert.Equal(expectedIsolatedAppThemeHash, ComputeFileHashOrNull(isolatedAppThemePath));
+            Assert.Equal(expectedIsolatedMarkdownThemeHash, ComputeFileHashOrNull(isolatedMarkdownThemePath));
+            Assert.Equal(AppTheme.Light, appThemeSettings.Load());
+            Assert.Equal(MarkdownTheme.Sepia, markdownThemeSettings.Load());
+
+            // Verify host user settings were never modified
+            Assert.Equal(hostAppThemeBefore, ComputeFileHashOrNull(hostAppThemePath));
+            Assert.Equal(hostMarkdownThemeBefore, ComputeFileHashOrNull(hostMarkdownThemePath));
+        }
+        finally
+        {
+            Registry.CurrentUser.DeleteSubKeyTree(testRegistryRoot, throwOnMissingSubKey: false);
+        }
+    }
+
     private static void AssertIsolatedProcess(
         string exePath,
         string workingDirectory,
@@ -174,7 +486,9 @@ public sealed class DeploymentAndGuideVerificationTests
         string isolatedTemp,
         string arguments,
         string expectedState,
-        string? expectedBadge = null)
+        string? expectedBadge = null,
+        string? expectedAppTheme = null,
+        string? expectedMarkdownTheme = null)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -219,6 +533,32 @@ public sealed class DeploymentAndGuideVerificationTests
         {
             Assert.Contains($"|BADGE={expectedBadge}|", stdout, StringComparison.Ordinal);
         }
+
+        if (!string.IsNullOrEmpty(expectedAppTheme))
+        {
+            Assert.Contains($"|THEME={expectedAppTheme}|", stdout, StringComparison.Ordinal);
+        }
+
+        if (!string.IsNullOrEmpty(expectedMarkdownTheme))
+        {
+            Assert.Contains($"|MDTHEME={expectedMarkdownTheme}", stdout, StringComparison.Ordinal);
+        }
+    }
+
+    private static void RenderWindow(Window window)
+    {
+        window.UpdateLayout();
+        Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+        window.UpdateLayout();
+    }
+
+    private static void CompleteSynchronously(Task task) => task.GetAwaiter().GetResult();
+
+    private sealed class IsolatedExplorerSelectionStub : IExplorerSelectionService
+    {
+        public string? SelectedPath { get; set; }
+
+        public Task<string?> GetSelectedPathAsync(ExplorerContext context) => Task.FromResult(SelectedPath);
     }
 
     private static string FindRepositoryRoot()
