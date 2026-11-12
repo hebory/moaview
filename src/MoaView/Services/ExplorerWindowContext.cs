@@ -37,6 +37,8 @@ public static class ExplorerWindowContext
         return null;
     }
 
+    public static bool IsWindow(nint window) => window != 0 && IsWindowNative(window);
+
     private static string GetClass(nint window)
     {
         var buffer = new StringBuilder(256);
@@ -53,6 +55,9 @@ public static class ExplorerWindowContext
 
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
+    [DllImport("user32.dll", EntryPoint = "IsWindow")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowNative(nint window);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetClassName(nint window, StringBuilder className, int maxCount);
     [DllImport("user32.dll")]

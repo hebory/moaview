@@ -66,7 +66,7 @@ powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1 -Version 0.
 powershell.exe -NoProfile -File scripts/Test-Portable.ps1 -PublishDirectory artifacts/publish/win-x64
 ```
 
-이 검사는 새 폴더 복사본에서 실제 창을 기동해 JPEG·PNG·BMP·정적 GIF·TIFF, ZIP 목록, 손상·미지원 안내를 확인하고 결과 JSON을 남깁니다. 전역 .NET 경로는 자식 프로세스에 한해 제한하고, 기존 설치·레지스트리를 변경하지 않으며 사용자 테마 설정 해시도 대조합니다. 깨끗한 Windows 설치·제거 또는 WebView2 미설치 환경 검증을 대신하지 않습니다. [QUIC-7 검증 범위](QUIC-7-usability-verification.md) · [QUIC-8 검증 및 한계 기록](QUIC-8-clean-environment-verification.md) · [QUIC-9 격리 환경 실검증 기록](QUIC-9-isolated-environment-verification.md)
+이 검사는 새 폴더 복사본에서 실제 창을 기동해 JPEG·PNG·BMP·정적 GIF·TIFF, ZIP 목록, 손상·미지원 안내를 확인하고 결과 JSON을 남깁니다. 전역 .NET 경로는 자식 프로세스에 한해 제한하고, 기존 설치·레지스트리를 변경하지 않으며 사용자 테마 설정 해시도 대조합니다. 깨끗한 Windows 설치·제거 또는 WebView2 미설치 환경 검증을 대신하지 않습니다. [QUIC-7 검증 범위](QUIC-7-usability-verification.md) · [QUIC-8 검증 및 한계 기록](QUIC-8-clean-environment-verification.md) · [QUIC-9 격리 환경 실검증 기록](QUIC-9-isolated-environment-verification.md) · [QUIC-10 잔여 시나리오 검증 기록](QUIC-10-residual-scenario-verification.md)
 
 ## 깨끗한 Windows 환경 설치·실행·제거 검증
 

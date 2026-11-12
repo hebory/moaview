@@ -42,6 +42,14 @@ public sealed class ExplorerPreviewPresenter : IExplorerPreviewPresenter
             };
             Window = window;
         }
+        else if (context.WindowHandle != 0)
+        {
+            var helper = new WindowInteropHelper(Window);
+            if (helper.Owner != context.WindowHandle)
+            {
+                helper.Owner = context.WindowHandle;
+            }
+        }
 
         Window.ViewModel.OpenFile(path);
         Window.Show();

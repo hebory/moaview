@@ -18,7 +18,8 @@ public interface IExplorerPreviewPresenter
 public sealed class ExplorerPreviewCoordinator(
     IExplorerSelectionService selectionService,
     IExplorerPreviewPresenter presenter,
-    Func<ExplorerContext?> getCurrentContext) : IDisposable
+    Func<ExplorerContext?> getCurrentContext,
+    Func<nint, bool>? isWindowAlive = null) : IDisposable
 {
     private int _generation;
     private bool _opening;
@@ -93,8 +94,24 @@ public sealed class ExplorerPreviewCoordinator(
 
     public async Task RefreshAsync()
     {
-        if (_disposed || _queryPending || !presenter.IsOpen)
+        if (_disposed || _queryPending)
         {
+            return;
+        }
+
+        if (!presenter.IsOpen)
+        {
+            if (_path is not null && !_opening)
+            {
+                Close();
+            }
+
+            return;
+        }
+
+        if (_source.WindowHandle != 0 && isWindowAlive is not null && !isWindowAlive(_source.WindowHandle))
+        {
+            Close();
             return;
         }
 
@@ -163,6 +180,7 @@ public sealed class ExplorerPreviewCoordinator(
         ++_generation;
         _opening = false;
         _pendingOpen = null;
+        _source = default;
         _path = null;
         presenter.Close();
     }

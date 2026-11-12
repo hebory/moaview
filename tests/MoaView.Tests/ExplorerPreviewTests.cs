@@ -384,6 +384,303 @@ public sealed class ExplorerPreviewTests
     }
 
     [Fact]
+    public void SpaceGesture_LongPressConsumesTypematicRepeatsAndRecoversLostKeyUpOnlyAfterQuietPeriod()
+    {
+        var gesture = new SpaceKeyGesture();
+        Assert.False(gesture.IsPressed);
+
+        // Initial Space press in Explorer toggles once.
+        Assert.Equal(SpaceKeyAction.Toggle, gesture.Handle(isDown: true, eligible: true));
+        Assert.True(gesture.IsPressed);
+
+        // Sustained typematic repeats while holding Space must be consumed without re-toggling.
+        for (var repeat = 0; repeat < 25; repeat++)
+        {
+            Assert.Equal(SpaceKeyAction.Consume, gesture.Handle(isDown: true, eligible: false));
+            Assert.True(gesture.IsPressed);
+        }
+
+        // Maintenance timer must not reset while the key is physically down or while repeats are recent.
+        Assert.False(gesture.RecoverReleasedKey(physicallyDown: true, TimeSpan.FromSeconds(5)));
+        Assert.False(gesture.RecoverReleasedKey(physicallyDown: false, TimeSpan.FromMilliseconds(1400)));
+        Assert.True(gesture.IsPressed);
+
+        // Normal key-up consumes the release and allows the next long-press to toggle closed once.
+        Assert.Equal(SpaceKeyAction.Consume, gesture.Handle(isDown: false, eligible: true));
+        Assert.False(gesture.IsPressed);
+
+        Assert.Equal(SpaceKeyAction.Toggle, gesture.Handle(isDown: true, eligible: true));
+        for (var repeat = 0; repeat < 15; repeat++)
+        {
+            Assert.Equal(SpaceKeyAction.Consume, gesture.Handle(isDown: true, eligible: false));
+        }
+
+        // If a key-up was lost (e.g. hook replaced or desktop switched), recovery resets after 1500ms quiet period.
+        Assert.True(gesture.RecoverReleasedKey(physicallyDown: false, TimeSpan.FromMilliseconds(1500)));
+        Assert.False(gesture.IsPressed);
+        Assert.Equal(SpaceKeyAction.Toggle, gesture.Handle(isDown: true, eligible: true));
+        Assert.Equal(SpaceKeyAction.Consume, gesture.Handle(isDown: false, eligible: true));
+    }
+
+    [Fact]
+    public void HookAndPresenter_LongPressOpensAndClosesRealPreviewWindowOnceWhilePeriodicRenewalRuns()
+    {
+        using var temp = new TempTestDirectory();
+        var samplePng = SampleImageFactory.WriteValidImage(temp.GetPath("long-press.png"), ImageFormatKind.Png, 64, 48);
+
+        StaTestRunner.Run(() =>
+        {
+            var diagnostics = new List<string>();
+            var presenter = new ExplorerPreviewPresenter();
+            var explorerWindow = new MainWindow { ShowActivated = false, ShowInTaskbar = false };
+            ExplorerSpaceKeyHook? hook = null;
+            try
+            {
+                explorerWindow.Show();
+                var explorerHandle = new System.Windows.Interop.WindowInteropHelper(explorerWindow).Handle;
+                var context = new ExplorerContext(explorerHandle, 101);
+                var selection = new SelectionStub { Path = samplePng };
+                using var coordinator = new ExplorerPreviewCoordinator(
+                    selection,
+                    presenter,
+                    () => context,
+                    ExplorerWindowContext.IsWindow);
+
+                hook = new ExplorerSpaceKeyHook(
+                    source => CompleteSynchronously(coordinator.ToggleAsync(source)),
+                    TimeSpan.FromMilliseconds(60),
+                    message =>
+                    {
+                        lock (diagnostics)
+                        {
+                            diagnostics.Add(message);
+                        }
+                    });
+
+                Assert.NotEqual(0, hook.RegistrationHandle);
+                Thread.Sleep(180);
+                Assert.True(hook.RegistrationCount >= 2, $"Expected periodic hook renewal, got RegistrationCount={hook.RegistrationCount}");
+                Assert.NotEqual(0, hook.RegistrationHandle);
+
+                // Long-press #1 (1 initial down + 15 typematic repeat downs + 1 up) opens the real WPF preview window once.
+                var gesture = new SpaceKeyGesture();
+                for (var step = 0; step < 16; step++)
+                {
+                    var captured = !gesture.IsPressed ? context : (ExplorerContext?)null;
+                    var action = gesture.Handle(isDown: true, captured is not null);
+                    if (action == SpaceKeyAction.Toggle && captured is { } target)
+                    {
+                        CompleteSynchronously(coordinator.ToggleAsync(target));
+                    }
+                }
+
+                Render(presenter.Window!);
+                Assert.True(presenter.IsOpen);
+                Assert.Equal(1, selection.ReadCount);
+                Assert.True(presenter.Window!.VerifyRenderedState());
+                Assert.Equal(64, presenter.Window.ViewModel.DisplayPixelWidth);
+                Assert.Equal(SpaceKeyAction.Consume, gesture.Handle(isDown: false, eligible: true));
+                Assert.True(presenter.IsOpen);
+
+                // Long-press #2 (1 initial down + 15 typematic repeat downs + 1 up) closes the preview window once.
+                for (var step = 0; step < 16; step++)
+                {
+                    var captured = !gesture.IsPressed ? context : (ExplorerContext?)null;
+                    var action = gesture.Handle(isDown: true, captured is not null);
+                    if (action == SpaceKeyAction.Toggle && captured is { } target)
+                    {
+                        CompleteSynchronously(coordinator.ToggleAsync(target));
+                    }
+                }
+
+                Assert.Equal(SpaceKeyAction.Consume, gesture.Handle(isDown: false, eligible: true));
+                Assert.False(presenter.IsOpen);
+                Assert.Null(presenter.Window);
+                Assert.Equal(1, selection.ReadCount);
+            }
+            finally
+            {
+                hook?.Dispose();
+                presenter.Close();
+                explorerWindow.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void PresenterAndCoordinator_TabSwitchInSameExplorerWindowUpdatesRenderedPreviewAndImmediateSpaceSwitchesTab()
+    {
+        using var temp = new TempTestDirectory();
+        var tab1Image = SampleImageFactory.WriteValidImage(temp.GetPath("tab1.png"), ImageFormatKind.Png, 72, 48);
+        var tab2Image = SampleImageFactory.WriteValidImage(temp.GetPath("tab2.bmp"), ImageFormatKind.Bmp, 40, 80);
+        var tab3Zip = ContentPreviewTests.WriteZip(
+            temp.GetPath("tab3.zip"),
+            new Dictionary<string, byte[]>
+            {
+                ["note.txt"] = System.Text.Encoding.UTF8.GetBytes("탭 전환 ZIP 내부 텍스트"),
+                ["inner.png"] = File.ReadAllBytes(tab1Image),
+            });
+
+        StaTestRunner.Run(() =>
+        {
+            var presenter = new ExplorerPreviewPresenter();
+            var explorerWindow = new MainWindow { ShowActivated = false, ShowInTaskbar = false };
+            try
+            {
+                explorerWindow.Show();
+                var explorerHwnd = new System.Windows.Interop.WindowInteropHelper(explorerWindow).Handle;
+                var tab1 = new ExplorerContext(explorerHwnd, 101);
+                var tab2 = new ExplorerContext(explorerHwnd, 102);
+                var tab3 = new ExplorerContext(explorerHwnd, 103);
+                var tab4SamePath = new ExplorerContext(explorerHwnd, 104);
+                var tab5Empty = new ExplorerContext(explorerHwnd, 105);
+
+                ExplorerContext? activeContext = tab1;
+                var tabSelections = new Dictionary<ExplorerContext, string?>
+                {
+                    [tab1] = tab1Image,
+                    [tab2] = tab2Image,
+                    [tab3] = tab3Zip,
+                    [tab4SamePath] = tab3Zip,
+                    [tab5Empty] = null,
+                };
+                var selection = new ContextSelectionStub(ctx => tabSelections.GetValueOrDefault(ctx));
+                using var coordinator = new ExplorerPreviewCoordinator(
+                    selection,
+                    presenter,
+                    () => activeContext,
+                    ExplorerWindowContext.IsWindow);
+
+                // 1. Open Space preview on Tab 1
+                CompleteSynchronously(coordinator.ToggleAsync(tab1));
+                Assert.True(presenter.IsOpen);
+                var peek = presenter.Window!;
+                Render(peek);
+                Assert.Equal(explorerHwnd, new System.Windows.Interop.WindowInteropHelper(peek).Owner);
+                Assert.Equal(72, peek.ViewModel.DisplayPixelWidth);
+                Assert.True(peek.VerifyRenderedState());
+
+                // 2. Switch to Tab 2 and press Space immediately (before 200ms RefreshAsync): opens Tab 2 selection
+                activeContext = tab2;
+                CompleteSynchronously(coordinator.ToggleAsync(tab2));
+                Assert.True(presenter.IsOpen);
+                peek = presenter.Window!;
+                Render(peek);
+                Assert.Equal(explorerHwnd, new System.Windows.Interop.WindowInteropHelper(peek).Owner);
+                Assert.Equal(40, peek.ViewModel.DisplayPixelWidth);
+                Assert.Equal(80, peek.ViewModel.DisplayPixelHeight);
+                Assert.True(peek.VerifyRenderedState());
+
+                // 3. Switch to Tab 3 and let periodic RefreshAsync update the open preview window in-place to ZIP
+                activeContext = tab3;
+                CompleteSynchronously(coordinator.RefreshAsync());
+                Assert.True(presenter.IsOpen);
+                Assert.Same(peek, presenter.Window);
+                Render(peek);
+                Assert.Equal(PreviewStateKind.ArchiveLoaded, peek.ViewModel.State);
+                Assert.True(peek.VerifyRenderedState());
+
+                // 4. Switch to Tab 4 (which has the same file path selected as Tab 3); RefreshAsync updates active tab source so Space closes it
+                activeContext = tab4SamePath;
+                CompleteSynchronously(coordinator.RefreshAsync());
+                Assert.True(presenter.IsOpen);
+                CompleteSynchronously(coordinator.ToggleAsync(tab4SamePath));
+                Assert.False(presenter.IsOpen);
+                Assert.Null(presenter.Window);
+
+                // 5. Reopen on Tab 1, then switch to Tab 5 (no selection): RefreshAsync closes the preview
+                activeContext = tab1;
+                CompleteSynchronously(coordinator.ToggleAsync(tab1));
+                Assert.True(presenter.IsOpen);
+                Render(presenter.Window!);
+                Assert.True(presenter.Window!.VerifyRenderedState());
+
+                activeContext = tab5Empty;
+                CompleteSynchronously(coordinator.RefreshAsync());
+                Assert.False(presenter.IsOpen);
+                Assert.Null(presenter.Window);
+            }
+            finally
+            {
+                presenter.Close();
+                explorerWindow.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void PresenterAndCoordinator_ExplorerWindowCloseCleansUpPreviewAndRestartedExplorerOpensNewPreview()
+    {
+        using var temp = new TempTestDirectory();
+        var firstImage = SampleImageFactory.WriteValidImage(temp.GetPath("before-restart.png"), ImageFormatKind.Png, 64, 32);
+        var secondImage = SampleImageFactory.WriteValidImage(temp.GetPath("after-restart.bmp"), ImageFormatKind.Bmp, 48, 96);
+
+        StaTestRunner.Run(() =>
+        {
+            var presenter = new ExplorerPreviewPresenter();
+            var explorerWindow1 = new MainWindow { ShowActivated = false, ShowInTaskbar = false };
+            var explorerWindow2 = new MainWindow { ShowActivated = false, ShowInTaskbar = false };
+            try
+            {
+                explorerWindow1.Show();
+                var hwnd1 = new System.Windows.Interop.WindowInteropHelper(explorerWindow1).Handle;
+                Assert.True(ExplorerWindowContext.IsWindow(hwnd1));
+                var context1 = new ExplorerContext(hwnd1, 101);
+
+                ExplorerContext? activeContext = context1;
+                var selection = new SelectionStub { Path = firstImage };
+                using var coordinator = new ExplorerPreviewCoordinator(
+                    selection,
+                    presenter,
+                    () => activeContext,
+                    ExplorerWindowContext.IsWindow);
+
+                // Open preview owned by the first Explorer window
+                CompleteSynchronously(coordinator.ToggleAsync(context1));
+                Assert.True(presenter.IsOpen);
+                Render(presenter.Window!);
+                Assert.Equal(hwnd1, new System.Windows.Interop.WindowInteropHelper(presenter.Window!).Owner);
+                Assert.Equal(64, presenter.Window!.ViewModel.DisplayPixelWidth);
+                Assert.True(presenter.Window.VerifyRenderedState());
+
+                // Close the first Explorer window and move focus outside Explorer (activeContext = null)
+                activeContext = null;
+                explorerWindow1.Close();
+                Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.False(ExplorerWindowContext.IsWindow(hwnd1));
+
+                // RefreshAsync cleans up any previous preview window and coordinator state
+                CompleteSynchronously(coordinator.RefreshAsync());
+                Assert.False(presenter.IsOpen);
+                Assert.Null(presenter.Window);
+
+                // Start a new Explorer window and press Space to open a new preview
+                explorerWindow2.Show();
+                var hwnd2 = new System.Windows.Interop.WindowInteropHelper(explorerWindow2).Handle;
+                Assert.True(ExplorerWindowContext.IsWindow(hwnd2));
+                Assert.NotEqual(hwnd1, hwnd2);
+                var context2 = new ExplorerContext(hwnd2, 202);
+                activeContext = context2;
+                selection.Path = secondImage;
+
+                CompleteSynchronously(coordinator.ToggleAsync(context2));
+                Assert.True(presenter.IsOpen);
+                Render(presenter.Window!);
+                Assert.Equal(hwnd2, new System.Windows.Interop.WindowInteropHelper(presenter.Window!).Owner);
+                Assert.Equal(48, presenter.Window!.ViewModel.DisplayPixelWidth);
+                Assert.Equal(96, presenter.Window.ViewModel.DisplayPixelHeight);
+                Assert.True(presenter.Window.VerifyRenderedState());
+            }
+            finally
+            {
+                presenter.Close();
+                explorerWindow1.Close();
+                explorerWindow2.Close();
+            }
+        });
+    }
+
+    [Fact]
     public async Task SelectionService_UnknownExplorerWindowReturnsNoFileAndCanBeDisposed()
     {
         using var service = new WindowsExplorerSelectionService();
@@ -397,6 +694,13 @@ public sealed class ExplorerPreviewTests
         window.UpdateLayout();
         Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
         window.UpdateLayout();
+    }
+
+    private static void CompleteSynchronously(Task task) => task.GetAwaiter().GetResult();
+
+    private sealed class ContextSelectionStub(Func<ExplorerContext, string?> resolver) : IExplorerSelectionService
+    {
+        public Task<string?> GetSelectedPathAsync(ExplorerContext context) => Task.FromResult(resolver(context));
     }
 
     private sealed class SelectionStub : IExplorerSelectionService

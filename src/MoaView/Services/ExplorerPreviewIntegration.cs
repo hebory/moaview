@@ -39,7 +39,11 @@ public sealed class ExplorerPreviewIntegration : IDisposable
         try
         {
             _selection = selection = new WindowsExplorerSelectionService();
-            _coordinator = new ExplorerPreviewCoordinator(_selection, new ExplorerPreviewPresenter(), ExplorerWindowContext.Capture);
+            _coordinator = new ExplorerPreviewCoordinator(
+                _selection,
+                new ExplorerPreviewPresenter(),
+                ExplorerWindowContext.Capture,
+                ExplorerWindowContext.IsWindow);
             _hook = hook = new ExplorerSpaceKeyHook(context =>
             {
                 if (!dispatcher.HasShutdownStarted)

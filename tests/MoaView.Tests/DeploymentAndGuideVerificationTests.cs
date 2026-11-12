@@ -85,6 +85,7 @@ public sealed class DeploymentAndGuideVerificationTests
         Assert.Contains("scripts/Test-Installer.ps1", installDocText, StringComparison.Ordinal);
         Assert.Contains("QUIC-8-clean-environment-verification.md", installDocText, StringComparison.Ordinal);
         Assert.Contains("QUIC-9-isolated-environment-verification.md", installDocText, StringComparison.Ordinal);
+        Assert.Contains("QUIC-10-residual-scenario-verification.md", installDocText, StringComparison.Ordinal);
 
         var quic9DocPath = Path.Combine(repoRoot, "docs", "QUIC-9-isolated-environment-verification.md");
         Assert.True(File.Exists(quic9DocPath));
@@ -93,11 +94,21 @@ public sealed class DeploymentAndGuideVerificationTests
         Assert.Contains("app-theme.json", quic9DocText, StringComparison.Ordinal);
         Assert.Contains("markdown-theme.json", quic9DocText, StringComparison.Ordinal);
 
+        var quic10DocPath = Path.Combine(repoRoot, "docs", "QUIC-10-residual-scenario-verification.md");
+        Assert.True(File.Exists(quic10DocPath));
+        var quic10DocText = File.ReadAllText(quic10DocPath);
+        Assert.Contains("ExplorerPreviewTests", quic10DocText, StringComparison.Ordinal);
+        Assert.Contains("DeploymentAndGuideVerificationTests", quic10DocText, StringComparison.Ordinal);
+
+        var explorerDocText = File.ReadAllText(Path.Combine(repoRoot, "docs", "explorer-preview.md"));
+        Assert.Contains("QUIC-10-residual-scenario-verification.md", explorerDocText, StringComparison.Ordinal);
+
         var contentDocText = File.ReadAllText(Path.Combine(repoRoot, "docs", "content-preview.md"));
         var readmeText = File.ReadAllText(Path.Combine(repoRoot, "README.md"));
         Assert.Contains($"MoaView-{version}-Setup-x64.exe", readmeText, StringComparison.Ordinal);
         Assert.Contains("docs/QUIC-8-clean-environment-verification.md", readmeText, StringComparison.Ordinal);
         Assert.Contains("docs/QUIC-9-isolated-environment-verification.md", readmeText, StringComparison.Ordinal);
+        Assert.Contains("docs/QUIC-10-residual-scenario-verification.md", readmeText, StringComparison.Ordinal);
 
         foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tiff" })
         {
@@ -323,17 +334,59 @@ public sealed class DeploymentAndGuideVerificationTests
             var unsupportedBin = Path.Combine(samplesDir, "unknown.bin");
             File.WriteAllBytes(unsupportedBin, [0x00, 0x01, 0xFF]);
 
+            var ppmSample = Path.Combine(samplesDir, "sample.ppm");
+            File.WriteAllText(ppmSample, "P3\n1 1\n255\n255 0 0\n", Encoding.ASCII);
+
+            var svgSample = Path.Combine(samplesDir, "sample.svg");
+            File.WriteAllText(
+                svgSample,
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"30\"><rect width=\"40\" height=\"30\" fill=\"blue\"/></svg>",
+                Encoding.UTF8);
+
+            var riveSample = Path.Combine(repoRoot, "tests", "MoaView.Tests", "Fixtures", "data_bind_runtime_test.riv");
+            Assert.True(File.Exists(riveSample));
+            var webView2Installed = IsWebView2Installed();
+
             AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, "--verify-startup", "Empty", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
             AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{jpgSample}\"", "ImageLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
             AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{pngSample}\"", "ImageLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
             AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{bmpSample}\"", "ImageLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
             AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{gifSample}\"", "ImageLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
             AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{tiffSample}\"", "ImageLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
+            AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{ppmSample}\"", "ImageLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
             AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{zipSample}\"", "ArchiveLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
             AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{mdSample}\"", "TextLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
             AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{damagedJpg}\"", "Error", expectedBadge: "열기 실패", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
             AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup \"{unsupportedBin}\"", "TextLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
-            AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup --preview \"{pngSample}\"", "ImageLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
+            AssertIsolatedProcess(
+                installedExe,
+                isolatedInstallDir,
+                isolatedProfile,
+                isolatedTemp,
+                $"--verify-startup \"{riveSample}\"",
+                "RiveLoaded",
+                expectedAppTheme: "Light",
+                expectedMarkdownTheme: "Sepia",
+                expectedReportToken: webView2Installed ? "|RIVE=ready|" : "|RIVE=error|");
+            AssertIsolatedProcess(
+                installedExe,
+                isolatedInstallDir,
+                isolatedProfile,
+                isolatedTemp,
+                $"--verify-startup \"{svgSample}\"",
+                "SpecializedLoaded",
+                expectedAppTheme: "Light",
+                expectedMarkdownTheme: "Sepia",
+                expectedReportToken: webView2Installed ? "|SPECIALIZED=ready|" : "|SPECIALIZED=error|");
+
+            using (var registeredMenuCommandKey = Registry.CurrentUser.OpenSubKey(menuCommandSubKey, writable: false))
+            {
+                Assert.NotNull(registeredMenuCommandKey);
+                var commandTemplate = Assert.IsType<string>(registeredMenuCommandKey!.GetValue(string.Empty));
+                Assert.Equal($"\"{installedExe}\" --preview \"%1\"", commandTemplate);
+                var resolvedArguments = commandTemplate[$"\"{installedExe}\"".Length..].Trim().Replace("%1", pngSample, StringComparison.Ordinal);
+                AssertIsolatedProcess(installedExe, isolatedInstallDir, isolatedProfile, isolatedTemp, $"--verify-startup {resolvedArguments}", "ImageLoaded", expectedAppTheme: "Light", expectedMarkdownTheme: "Sepia");
+            }
 
             // 4. Verify Explorer Space preview, selection switching, image manipulation/conversion, and ZIP internal preview
             var convertedOutputPath = Path.Combine(samplesDir, "converted-from-space.png");
@@ -488,7 +541,8 @@ public sealed class DeploymentAndGuideVerificationTests
         string expectedState,
         string? expectedBadge = null,
         string? expectedAppTheme = null,
-        string? expectedMarkdownTheme = null)
+        string? expectedMarkdownTheme = null,
+        string? expectedReportToken = null)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -543,6 +597,31 @@ public sealed class DeploymentAndGuideVerificationTests
         {
             Assert.Contains($"|MDTHEME={expectedMarkdownTheme}", stdout, StringComparison.Ordinal);
         }
+
+        if (!string.IsNullOrEmpty(expectedReportToken))
+        {
+            Assert.Contains(expectedReportToken, stdout, StringComparison.Ordinal);
+        }
+    }
+
+    private static bool IsWebView2Installed()
+    {
+        const string clientSubKey = @"Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}";
+        foreach (var (hive, subKey) in new (RegistryKey, string)[]
+        {
+            (Registry.LocalMachine, $@"SOFTWARE\WOW6432Node\{clientSubKey}"),
+            (Registry.LocalMachine, $@"SOFTWARE\{clientSubKey}"),
+            (Registry.CurrentUser, $@"Software\{clientSubKey}"),
+        })
+        {
+            using var key = hive.OpenSubKey(subKey, writable: false);
+            if (key?.GetValue("pv") is string pv && !string.IsNullOrWhiteSpace(pv) && pv != "0.0.0.0")
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void RenderWindow(Window window)
