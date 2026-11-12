@@ -143,7 +143,7 @@ internal sealed class LocalMediaPreviewControl : SpecializedPreviewControl
         {
             Loaded -= Start;
             if (IsDisposed) return;
-            LoadTrack(path, autoplay: !IsMusic, notifyHost: false);
+            LoadTrack(path, autoplay: true, notifyHost: false);
             if (IsMusic) _ = LoadPlaylistAsync(path);
         }
     }

@@ -12,7 +12,7 @@ WorkMesh 프로젝트 채널: `moaview`
 
 [최신 Windows x64 설치 파일 다운로드](https://github.com/hebory/moaview/releases/latest)
 
-0.1.12 설치 파일의 출력 경로와 이름은 `artifacts/installer/MoaView-0.1.12-Setup-x64.exe`입니다. 빌드 명령은 `powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1 -Version 0.1.12`입니다. 설치 파일은 코드 서명이 없는 개발 배포본입니다. [설치 및 다시 빌드 안내](docs/install.md)
+0.1.13 설치 파일의 출력 경로와 이름은 `artifacts/installer/MoaView-0.1.13-Setup-x64.exe`입니다. 빌드 명령은 `powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1 -Version 0.1.13`입니다. 설치 파일은 코드 서명이 없는 개발 배포본입니다. [설치 및 다시 빌드 안내](docs/install.md)
 
 ## 런처용 이미지
 
@@ -42,7 +42,7 @@ WorkMesh 프로젝트 채널: `moaview`
 - SVG·WebP·AVIF·ICO·APNG·BPG와 애니메이션 GIF를 WebView2에서 표시합니다. [형식별 보기와 제한](docs/content-preview.md)
 - PDF 페이지와 TTF·OTF 글꼴 견본을 표시합니다. MP4·MOV·MKV·MP3·WAV·FLAC 등은 Windows에 설치된 코덱으로 재생합니다.
 - 동영상은 Windows 미디어 엔진에서 실제 프레임을 받아 화면에 전달한 뒤 자동 재생합니다. 준비·위치 이동 중에는 영상과 소리를 함께 멈추며, 프레임을 읽거나 갱신하지 못하면 재생을 중단하고 안내합니다.
-- 음악은 같은 폴더의 곡 목록, 이전·다음 곡, 정지, 전체·한 곡 반복, 셔플과 제목·아티스트·앨범 표시를 지원합니다. 곡을 바꿔도 음량·음소거·배속이 유지됩니다.
+- 음악은 파일을 열고 재생 준비가 끝나면 자동 재생합니다. 같은 폴더의 곡 목록, 이전·다음 곡, 정지, 전체·한 곡 반복, 셔플과 제목·아티스트·앨범 표시를 지원합니다. 곡을 바꿔도 음량·음소거·배속과 일시정지 상태가 유지됩니다.
 - 3D 모델(`GLB`, `GLTF`, `FBX`, `OBJ`, `STL`, `PLY`)을 회전·확대·이동하며 확인합니다. 화면 맞춤, 와이어프레임, 바닥 격자, 자동 회전과 포함 애니메이션 선택·재생을 제공합니다. 로컬 three.js와 WebView2를 사용하며 [형식별 제한](docs/content-preview.md)을 확인하세요.
 - ZIP·RAR·7Z·TAR·TAR.GZ와 CBZ·CBR·CB7을 열어 목록과 내부 항목을 확인합니다. EPUB·APK 등 ZIP 기반 패키지는 내부 목록으로 엽니다. 압축 해제는 메모리에서만 수행하며 솔리드 압축은 목록까지만 표시합니다.
 - 오피스·한글 내용 미리보기: `DOCX` 본문/표, `XLSX` 시트별 셀 주소/저장된 값/수식, `PPTX` 순서별 슬라이드 텍스트/표, `HWP 5.x` 본문과 표 안의 텍스트, `HWPX` 구역별 본문/표를 표시합니다. 구역·시트·슬라이드는 상단 선택 상자로 이동합니다. Office·한글 설치 없이 내용을 읽으며 원본 페이지 배치와 서식은 재현하지 않습니다.

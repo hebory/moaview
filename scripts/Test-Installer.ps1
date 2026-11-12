@@ -1,7 +1,7 @@
 ﻿param([string]$Installer)
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-if (!$Installer) { $Installer = Join-Path $repo 'artifacts/installer/MoaView-0.1.12-Setup-x64.exe' }
+if (!$Installer) { $Installer = Join-Path $repo 'artifacts/installer/MoaView-0.1.13-Setup-x64.exe' }
 $Installer = (Resolve-Path -LiteralPath $Installer).Path
 $registryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{23C80132-6E95-43B2-AD9B-A283239A5947}_is1'
 $menuKey = 'HKCU:\Software\Classes\*\shell\MoaView.Preview'

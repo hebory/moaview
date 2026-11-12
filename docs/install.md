@@ -1,6 +1,6 @@
 # MoaView Windows 설치
 
-`artifacts/installer/MoaView-0.1.12-Setup-x64.exe`를 실행해 설치합니다. Windows 10 1809 이상 또는 Windows 11의 x64/호환 환경용입니다. 관리자 권한 없이 현재 사용자에게 설치됩니다.
+`artifacts/installer/MoaView-0.1.13-Setup-x64.exe`를 실행해 설치합니다. Windows 10 1809 이상 또는 Windows 11의 x64/호환 환경용입니다. 관리자 권한 없이 현재 사용자에게 설치됩니다.
 
 - 기본 경로: `%LOCALAPPDATA%\Programs\MoaView`
 - 시작 메뉴에 MoaView가 등록됩니다. 바탕 화면 바로가기는 설치 중 선택합니다.
@@ -21,7 +21,7 @@ Windows 설정의 설치된 앱에서 MoaView를 제거하면 탐색기 우클�
 Windows x64 빌드 환경과 .NET 8 SDK가 필요합니다.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1 -Version 0.1.12
+powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1 -Version 0.1.13
 ```
 
 공식 Inno Setup 7.1.1을 `.tools`에 포터블 모드로 준비하고 서명을 확인합니다. WebView2 부트스트래퍼도 Microsoft 공식 배포처에서 내려받아 서명을 검증합니다. 앱을 자체 포함 방식으로 빌드한 뒤 설치 파일과 SHA-256을 `artifacts/installer`에 생성합니다. Inno Setup의 배포·사용 조건은 [공식 안내](https://jrsoftware.org/isinfo.php)를 참고하세요.
@@ -36,7 +36,7 @@ Visual Studio C++ x64 도구, Windows SDK, PowerShell 7이 있는 Windows 빌드
 
 ```powershell
 pwsh -NoProfile -File scripts/Build-ExplorerIdentity.ps1 -Version 0.1.3 -DevelopmentCertificate
-powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1 -Version 0.1.12 -ExplorerIdentityDirectory artifacts/explorer-identity/0.1.3
+powershell -ExecutionPolicy Bypass -File scripts/Build-Installer.ps1 -Version 0.1.13 -ExplorerIdentityDirectory artifacts/explorer-identity/0.1.3
 ```
 
 개발 빌드에서 생성한 공개 `MoaView-Development.cer`는 해당 빌드의 Windows 패키지 등록을 검증할 때 사용합니다. 설치하려는 Windows가 그 인증서를 신뢰해야 하며 설치 프로그램은 인증서 신뢰 저장소를 변경하지 않습니다. 신뢰된 배포용 서명 인증서가 `CurrentUser\My`에 있으면 첫 명령에서 `-DevelopmentCertificate` 대신 `-SigningThumbprint`로 인증서를 지정할 수 있습니다. [Microsoft 패키지 서명 안내](https://learn.microsoft.com/en-us/windows/apps/desktop/modernize/grant-identity-to-nonpackaged-apps#build-and-sign-the-identity-package)
@@ -81,7 +81,7 @@ powershell.exe -NoProfile -File scripts/Test-Portable.ps1 -PublishDirectory arti
    세 항목 모두 결과가 없어야 합니다.
 2. **설치·기동·우클릭 메뉴·제거 자동 검증 실행**:
    ```powershell
-   powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Installer.ps1 -Installer artifacts/installer/MoaView-0.1.12-Setup-x64.exe
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Installer.ps1 -Installer artifacts/installer/MoaView-0.1.13-Setup-x64.exe
    ```
    - `artifacts/install-check/<실행ID>/MoaView Test` 경로에 무인 설치(`/VERYSILENT`)하고 필수 런타임·에셋·안내 문서(`install.md`, `content-preview.md`, `third-party-notices.md`) 포함 여부를 확인합니다.
    - 전역 `.NET` 탐색을 차단한 상태로 설치된 `MoaView.exe --verify-startup`을 실행해 빈 시작 화면, 마크다운, 기본 이미지 5종(`JPEG`·`PNG`·`BMP`·`GIF`·`TIFF`), `ZIP` 아카이브, 손상된 이미지 오류 안내(`열기 실패`), 미지원 바이너리 상세 안내, `PPM` 이미지를 검증합니다.
@@ -89,7 +89,7 @@ powershell.exe -NoProfile -File scripts/Test-Portable.ps1 -PublishDirectory arti
    - WebView2 Runtime 설치 여부를 자동 감지하여, 설치된 환경에서는 `Rive`·`SVG` 렌더링 준비(`ready`)를 확인하고, WebView2가 없는 깨끗한 환경에서는 비정상 종료 없이 안내 상태(`error`)로 표시되는지 확인합니다.
    - 마지막 `finally` 단계에서 `unins000.exe /VERYSILENT`를 실행해 실행 파일, `Uninstall` 레지스트리 키, 탐색기 우클릭 메뉴 키, `Run` 자동 시작 값, Windows 11 식별 패키지가 모두 제거되고 `%LOCALAPPDATA%\MoaView\app-theme.json` 및 `markdown-theme.json` 사용자 설정 해시가 보존되었는지(`User settings preserved across install and uninstall`) 검증한 뒤 `artifacts/install-check/<실행ID>/results.json`에 결과를 저장합니다.
 3. **대화형 설치·탐색기 Space 미리보기·완전 제거 수동 확인**:
-   - `MoaView-0.1.12-Setup-x64.exe`를 실행해 기본 경로(`%LOCALAPPDATA%\Programs\MoaView`)에 설치하고 앱을 실행합니다.
+   - `MoaView-0.1.13-Setup-x64.exe`를 실행해 기본 경로(`%LOCALAPPDATA%\Programs\MoaView`)에 설치하고 앱을 실행합니다.
    - 탐색기에서 지원 이미지(`JPEG`·`PNG`·`BMP`·`GIF`·`TIFF`), `ZIP` 파일, 미지원 파일을 차례로 선택해 `Space`로 미리보기 열기·파일 전환·`Space`/`Esc` 닫기와 이미지 회전·확대·변환 저장을 확인합니다.
    - 트레이 메뉴에서 **MoaView 종료**를 선택한 뒤 **Windows 설정 → 앱 → 설치된 앱**에서 MoaView를 제거합니다.
    - 개인 테마 설정과 WebView2 캐시까지 모두 정리하려면 `%LOCALAPPDATA%\MoaView` 폴더를 삭제합니다.

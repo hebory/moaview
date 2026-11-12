@@ -197,7 +197,7 @@ public sealed class ExpandedPreviewTests
     }
 
     [Fact]
-    public void Wav_OpensWithExplicitPlaybackControls()
+    public void Wav_AutoplaysWhenReadyAndSupportsPlaybackControls()
     {
         using var temp = new TempTestDirectory();
         var path = temp.GetPath("audio.wav");
@@ -226,7 +226,7 @@ public sealed class ExpandedPreviewTests
             Assert.True(Complete(window.WaitForSpecializedPreviewAsync()), Status(window));
             var host = Host(window);
             var media = Descendants(host).OfType<MediaElement>().Single();
-            var play = FindControl<Button>("재생");
+            var play = FindControl<Button>("일시 정지");
             var mute = FindControl<Button>("음소거");
             var position = FindControl<Slider>("재생 위치");
             var volume = FindControl<Slider>("볼륨");
@@ -234,10 +234,15 @@ public sealed class ExpandedPreviewTests
             var elapsed = FindControl<TextBlock>("현재 재생 시간");
             var duration = FindControl<TextBlock>("전체 재생 시간");
             Assert.True(play.IsVisible);
-            Assert.Equal(AppIconKind.Play, Assert.IsType<AppIcon>(play.Content).Kind);
+            Assert.Equal("일시 정지", AutomationProperties.GetName(play));
+            Assert.Equal(AppIconKind.Pause, Assert.IsType<AppIcon>(play.Content).Kind);
             Assert.Equal("00:00", elapsed.Text);
             Assert.Equal("00:12", duration.Text);
 
+            PumpUntil(() => media.Position > TimeSpan.Zero, TimeSpan.FromSeconds(3), "음악 미리보기가 자동 재생되지 않았습니다.");
+            play.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal("재생", AutomationProperties.GetName(play));
+            Assert.Equal(AppIconKind.Play, Assert.IsType<AppIcon>(play.Content).Kind);
             var initialPosition = media.Position;
             position.RaiseEvent(new DragStartedEventArgs(0, 0) { RoutedEvent = Thumb.DragStartedEvent });
             position.Value = 4;
@@ -304,14 +309,16 @@ public sealed class ExpandedPreviewTests
             var previous = FindControl<Button>("이전 곡");
             var stop = FindControl<Button>("정지");
             var repeat = FindControl<Button>("반복 꺼짐");
-            var play = FindControl<Button>("재생");
+            var play = FindControl<Button>("일시 정지");
             var volume = FindControl<Slider>("볼륨");
             var speed = FindControl<ComboBox>("재생 속도");
             var firstPlayer = Descendants(host).OfType<MediaElement>().Single();
 
             volume.Value = 0.62;
             speed.SelectedItem = 1.5;
+            Assert.Equal("일시 정지", AutomationProperties.GetName(play));
             play.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal("재생", AutomationProperties.GetName(play));
             Assert.Equal(1.5, firstPlayer.SpeedRatio);
 
             next.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -320,8 +327,15 @@ public sealed class ExpandedPreviewTests
             var secondPlayer = Descendants(host).OfType<MediaElement>().Single();
             Assert.NotSame(firstPlayer, secondPlayer);
             Assert.Equal(0.62, secondPlayer.Volume);
+            Assert.Equal(1.5, speed.SelectedItem);
+            Assert.Equal("재생", AutomationProperties.GetName(play));
+            Assert.Equal(TimeSpan.Zero, secondPlayer.Position);
+            PumpFor(TimeSpan.FromMilliseconds(300));
+            Assert.Equal(TimeSpan.Zero, secondPlayer.Position);
+
+            play.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal("일시 정지", AutomationProperties.GetName(play));
             Assert.Equal(1.5, secondPlayer.SpeedRatio);
-            Assert.True(AutomationProperties.GetName(play) == "일시 정지");
 
             // A completion callback queued by the detached source must not advance the new source.
             firstPlayer.RaiseEvent(new RoutedEventArgs(MediaElement.MediaEndedEvent));
@@ -422,6 +436,31 @@ public sealed class ExpandedPreviewTests
         }
         Assert.True(task.IsCompleted, "미리보기가 제한 시간 안에 완료되지 않았습니다.");
         return task.GetAwaiter().GetResult();
+    }
+
+    private static void PumpUntil(Func<bool> condition, TimeSpan timeout, string message)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        var frame = new DispatcherFrame();
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(20) };
+        timer.Tick += (_, _) =>
+        {
+            if (condition() || DateTime.UtcNow >= deadline) frame.Continue = false;
+        };
+        timer.Start();
+        Dispatcher.PushFrame(frame);
+        timer.Stop();
+        Assert.True(condition(), message);
+    }
+
+    private static void PumpFor(TimeSpan duration)
+    {
+        var frame = new DispatcherFrame();
+        var timer = new DispatcherTimer { Interval = duration };
+        timer.Tick += (_, _) => frame.Continue = false;
+        timer.Start();
+        Dispatcher.PushFrame(frame);
+        timer.Stop();
     }
 
     private static byte[] Pdf()
